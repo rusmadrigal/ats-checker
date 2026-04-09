@@ -1,0 +1,342 @@
+'use client';
+
+import { useState } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
+import { Upload, CheckCircle, FileText, Zap, TrendingUp } from 'lucide-react';
+import { Toaster } from 'sonner';
+import { UploadDropzone } from './components/UploadDropzone';
+import { ScoreCard } from './components/ScoreCard';
+import { IssuesList } from './components/IssuesList';
+import { SuggestionCard } from './components/SuggestionCard';
+import { HowItWorksStep } from './components/HowItWorksStep';
+
+// type Language = 'en' | 'es';
+
+const translations = {
+  /*
+  // English (disabled for now — keep for re-enabling i18n)
+  en: {
+    title: 'ATS Resume Checker',
+    tagline: 'AI-Powered Resume Analysis',
+    headline: 'Check if your resume passes ATS filters',
+    subheadline:
+      'Get instant AI-powered analysis of your resume compatibility with Applicant Tracking Systems',
+    uploadButton: 'Upload Resume',
+    supportedFormats: 'Supports PDF and DOCX',
+    scoreTitle: 'ATS Compatibility Score',
+    issuesTitle: 'Issues Found',
+    suggestionsTitle: 'Suggested Improvements',
+    upgradeTitle: 'Improve your resume with AI',
+    upgradeDescription:
+      'Get personalized recommendations and AI-powered optimization to land more interviews',
+    upgradeButton: 'Optimize Resume',
+    howItWorksTitle: 'How it works',
+    step1Title: 'Upload your resume',
+    step1Desc: 'Drop your PDF or DOCX file to start the analysis',
+    step2Title: 'AI analyzes compatibility',
+    step2Desc: 'Our AI checks formatting, keywords, and structure',
+    step3Title: 'Get improvements',
+    step3Desc: 'Receive actionable suggestions to boost your ATS score',
+    footer: '© 2026 ATS Resume Checker. Built with AI.',
+    privacy: 'Privacy',
+    terms: 'Terms',
+  },
+  */
+  es: {
+    title: 'ATS Resume Checker',
+    tagline: 'Análisis de CV con IA',
+    headline: 'Verifica si tu CV pasa los filtros ATS',
+    subheadline:
+      'Obtén análisis instantáneo con IA de la compatibilidad de tu currículum con sistemas ATS',
+    uploadButton: 'Subir CV',
+    supportedFormats: 'Soporta PDF y DOCX',
+    scoreTitle: 'Puntuación de Compatibilidad ATS',
+    issuesTitle: 'Problemas Encontrados',
+    suggestionsTitle: 'Mejoras Sugeridas',
+    upgradeTitle: 'Mejora tu CV con IA',
+    upgradeDescription:
+      'Obtén recomendaciones personalizadas y optimización con IA para conseguir más entrevistas',
+    upgradeButton: 'Optimizar CV',
+    howItWorksTitle: 'Cómo funciona',
+    step1Title: 'Sube tu currículum',
+    step1Desc: 'Arrastra tu archivo PDF o DOCX para iniciar el análisis',
+    step2Title: 'IA analiza compatibilidad',
+    step2Desc: 'Nuestra IA revisa formato, palabras clave y estructura',
+    step3Title: 'Obtén mejoras',
+    step3Desc: 'Recibe sugerencias accionables para mejorar tu puntuación ATS',
+    footer: '© 2026 ATS Resume Checker. Creado con IA.',
+    privacy: 'Privacidad',
+    terms: 'Términos',
+  },
+} as const;
+
+const t = translations.es;
+/** Idioma fijo: español. Reactivar `en` arriba y estado `language` para volver al toggle. */
+const language = 'es' as const;
+
+export default function App() {
+  const [uploadedFile, setUploadedFile] = useState<File | null>(null);
+  const [showResults, setShowResults] = useState(false);
+
+  // const [language, setLanguage] = useState<Language>('en');
+  // const t = translations[language];
+  // const toggleLanguage = () => {
+  //   setLanguage(language === 'en' ? 'es' : 'en');
+  // };
+
+  const handleFileUpload = (file: File) => {
+    setUploadedFile(file);
+    setTimeout(() => {
+      setShowResults(true);
+    }, 1500);
+  };
+
+  const mockIssues: Array<{ type: 'error' | 'warning'; text: string }> = [
+    {
+      type: 'error',
+      text: 'Falta información de contacto en el encabezado',
+      // en: 'Missing contact information in header',
+    },
+    {
+      type: 'warning',
+      text: 'Usa más palabras clave específicas de la industria',
+      // en: 'Use more industry-specific keywords',
+    },
+    {
+      type: 'warning',
+      text: 'La sección de experiencia podría ser más cuantificable',
+      // en: 'Experience section could be more quantifiable',
+    },
+  ];
+
+  const mockSuggestions: Array<{ original: string; improved: string }> = [
+    {
+      original: 'Managed team projects',
+      improved:
+        'Led cross-functional team of 8 engineers, delivering 12+ projects on schedule with 95% stakeholder satisfaction',
+    },
+  ];
+
+  return (
+    <div className="bg-background min-h-screen">
+      <Toaster position="bottom-right" />
+
+      {/* Header */}
+      <motion.header
+        initial={{ y: -20, opacity: 0 }}
+        animate={{ y: 0, opacity: 1 }}
+        transition={{ duration: 0.6 }}
+        className="bg-card/80 border-border sticky top-0 z-50 border-b backdrop-blur-lg"
+      >
+        <div className="mx-auto flex max-w-[1100px] items-center justify-start px-6 py-4">
+          <div className="flex items-center gap-3">
+            <div className="bg-primary flex h-9 w-9 items-center justify-center rounded-xl">
+              <FileText className="text-primary-foreground h-5 w-5" />
+            </div>
+            <span className="text-foreground text-lg font-semibold">{t.title}</span>
+          </div>
+          {/*
+          <button
+            onClick={toggleLanguage}
+            className="bg-secondary hover:bg-muted focus-visible:ring-primary flex items-center gap-2 rounded-lg px-4 py-2 transition-colors focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none"
+            aria-label={
+              language === 'en' ? 'Switch language to Spanish' : 'Cambiar idioma a inglés'
+            }
+          >
+            <Globe className="text-muted-foreground h-4 w-4" />
+            <span className="text-sm font-medium">{language === 'en' ? 'EN' : 'ES'}</span>
+            <span className="text-muted-foreground">|</span>
+            <span className="text-muted-foreground text-sm">{language === 'en' ? 'ES' : 'EN'}</span>
+          </button>
+          */}
+        </div>
+      </motion.header>
+
+      <main>
+        {/* Hero Section */}
+        <section className="relative overflow-hidden">
+          <div className="from-accent/30 via-background to-background absolute inset-0 bg-gradient-to-br" />
+          <div className="relative mx-auto max-w-[1100px] px-6 pt-12 pb-16 md:pt-20 md:pb-24">
+            <motion.div
+              initial={{ y: 30, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              transition={{ duration: 0.8, delay: 0.2 }}
+              className="mx-auto max-w-3xl text-center"
+            >
+              <motion.div
+                initial={{ scale: 0.9, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                transition={{ duration: 0.6, delay: 0.3 }}
+                className="bg-accent/60 border-primary/20 mb-8 inline-flex items-center gap-2 rounded-full border px-4 py-2"
+              >
+                <Zap className="text-primary h-4 w-4" />
+                <span className="text-foreground text-sm font-medium">{t.tagline}</span>
+              </motion.div>
+
+              <h1 className="text-foreground mb-6 text-4xl leading-tight font-bold tracking-tight md:text-5xl lg:text-[56px]">
+                {t.headline}
+              </h1>
+
+              <p className="text-muted-foreground mb-12 text-base leading-relaxed md:text-lg lg:text-xl">
+                {t.subheadline}
+              </p>
+
+              <motion.div
+                initial={{ y: 20, opacity: 0 }}
+                animate={{ y: 0, opacity: 1 }}
+                transition={{ duration: 0.8, delay: 0.5 }}
+              >
+                <UploadDropzone onFileUpload={handleFileUpload} language={language} />
+              </motion.div>
+
+              {uploadedFile && (
+                <motion.p
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  className="text-muted-foreground mt-6 flex items-center justify-center gap-2 text-sm"
+                >
+                  <CheckCircle className="h-4 w-4 text-green-600" />
+                  {uploadedFile.name}
+                </motion.p>
+              )}
+            </motion.div>
+          </div>
+        </section>
+
+        {/* Results Section */}
+        <AnimatePresence>
+          {showResults && (
+            <motion.section
+              initial={{ opacity: 0, y: 40 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -40 }}
+              transition={{ duration: 0.6 }}
+              className="mx-auto max-w-[1100px] px-6 py-12 md:py-16"
+              aria-live="polite"
+            >
+              <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+                {/* Score Card */}
+                <div className="lg:col-span-1">
+                  <ScoreCard score={78} language={language} />
+                </div>
+
+                {/* Issues and Suggestions */}
+                <div className="space-y-6 lg:col-span-2">
+                  <IssuesList issues={mockIssues} title={t.issuesTitle} />
+                  <SuggestionCard
+                    suggestions={mockSuggestions}
+                    title={t.suggestionsTitle}
+                    language={language}
+                  />
+                </div>
+              </div>
+            </motion.section>
+          )}
+        </AnimatePresence>
+
+        {/* CTA Upgrade Section */}
+        <motion.section
+          initial={{ opacity: 0 }}
+          whileInView={{ opacity: 1 }}
+          viewport={{ once: true }}
+          transition={{ duration: 0.8 }}
+          className="mx-auto max-w-[1100px] px-6 py-12 md:py-16"
+        >
+          <div className="border-primary/10 from-primary/5 via-accent/30 to-primary/5 rounded-3xl border bg-gradient-to-br p-8 text-center md:p-12">
+            <motion.div
+              initial={{ y: 20, opacity: 0 }}
+              whileInView={{ y: 0, opacity: 1 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.6, delay: 0.2 }}
+            >
+              <h2 className="text-foreground mb-4 text-3xl leading-tight font-bold md:text-4xl">
+                {t.upgradeTitle}
+              </h2>
+              <p className="text-muted-foreground mx-auto mb-8 max-w-2xl text-base md:text-lg">
+                {t.upgradeDescription}
+              </p>
+              <motion.button
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                className="bg-primary text-primary-foreground shadow-primary/20 hover:shadow-primary/30 focus-visible:ring-primary inline-flex items-center gap-2 rounded-xl px-8 py-4 font-semibold shadow-lg transition-all hover:shadow-xl focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none"
+              >
+                <TrendingUp className="h-5 w-5" />
+                {t.upgradeButton}
+              </motion.button>
+            </motion.div>
+          </div>
+        </motion.section>
+
+        {/* How It Works */}
+        <section className="mx-auto max-w-[1100px] px-6 py-12 md:py-16">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.6 }}
+          >
+            <h2 className="text-foreground mb-16 text-center text-3xl font-bold md:text-4xl">
+              {t.howItWorksTitle}
+            </h2>
+
+            <div className="grid grid-cols-1 gap-12 md:grid-cols-3">
+              <HowItWorksStep
+                icon={<Upload className="h-8 w-8" />}
+                step="01"
+                title={t.step1Title}
+                description={t.step1Desc}
+                delay={0}
+              />
+              <HowItWorksStep
+                icon={<Zap className="h-8 w-8" />}
+                step="02"
+                title={t.step2Title}
+                description={t.step2Desc}
+                delay={0.1}
+              />
+              <HowItWorksStep
+                icon={<TrendingUp className="h-8 w-8" />}
+                step="03"
+                title={t.step3Title}
+                description={t.step3Desc}
+                delay={0.2}
+              />
+            </div>
+          </motion.div>
+        </section>
+      </main>
+
+      {/* Footer */}
+      <footer className="border-border mt-24 border-t">
+        <div className="mx-auto max-w-[1100px] px-6 py-12">
+          <div className="flex flex-col items-center justify-between gap-6 md:flex-row">
+            <p className="text-muted-foreground text-sm">{t.footer}</p>
+            <div className="flex items-center gap-8">
+              {/*
+              <button
+                onClick={toggleLanguage}
+                className="text-muted-foreground hover:text-foreground focus-visible:ring-primary flex items-center gap-2 text-sm transition-colors focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none"
+              >
+                <Globe className="h-4 w-4" />
+                {language === 'en' ? 'Español' : 'English'}
+              </button>
+              */}
+              <a
+                href="#"
+                className="text-muted-foreground hover:text-foreground text-sm transition-colors"
+              >
+                {t.privacy}
+              </a>
+              <a
+                href="#"
+                className="text-muted-foreground hover:text-foreground text-sm transition-colors"
+              >
+                {t.terms}
+              </a>
+            </div>
+          </div>
+        </div>
+      </footer>
+    </div>
+  );
+}
