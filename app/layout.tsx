@@ -23,7 +23,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="es">
-      <body className="overflow-x-hidden antialiased">
+      <body className="overflow-x-clip antialiased">
         {children}
         <CookieConsent />
       </body>

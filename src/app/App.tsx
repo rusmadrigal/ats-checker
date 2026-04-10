@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { motion, AnimatePresence } from 'motion/react';
@@ -26,6 +26,7 @@ import { AISuggestionsPanel } from './components/AISuggestionsPanel';
 import { ResumePreview } from './components/ResumePreview';
 import { Skeleton } from './components/ui/skeleton';
 import { deriveAtsInsights } from '@/src/lib/ats-score-insights';
+import { analyzeResumeText } from '@/src/lib/analyze-resume-heuristics';
 import type { AnalysisResult } from '@/src/lib/analysis-types';
 import { buildPlaintextFromStructured } from '@/src/lib/build-plaintext-from-structured';
 import type { CvApprovalMap, CvStructured } from '@/src/lib/cv-structured-types';
@@ -130,7 +131,8 @@ const translations = {
     previewRecoveredNoTokens: 'Vista previa recuperada sin llamar a la IA (mismo archivo).',
     sessionRestoredBanner:
       'Para descargar Word o PDF, sube de nuevo el mismo archivo en la zona de arriba: {name}',
-    downloadNeedsFile: 'Sube de nuevo el CV para descargar (necesitamos el archivo en el navegador).',
+    downloadNeedsFile:
+      'Sube de nuevo el CV para descargar (necesitamos el archivo en el navegador).',
     stepAnalysis: 'Análisis',
     stepSuggestions: 'Sugerencias',
     stepPreview: 'Vista previa',
@@ -152,7 +154,8 @@ const translations = {
     livePreviewTitle: 'Vista previa del CV',
     livePreviewSubtitle: 'Versión optimizada con mejoras de IA',
     previewEmptyTitle: 'Genera la vista previa estructurada',
-    previewEmptyHint: 'La IA organizará tu CV en secciones claras. Luego podrás aprobar cada cambio.',
+    previewEmptyHint:
+      'La IA organizará tu CV en secciones claras. Luego podrás aprobar cada cambio.',
     applyAllToast: 'Cambios de IA aplicados en la vista previa.',
     beforeTab: 'Antes',
     afterTab: 'Después',
@@ -187,6 +190,14 @@ export default function App() {
   /** Remonta el overlay de tips cada vez que arranca una nueva generación de vista previa. */
   const [previewOverlayKey, setPreviewOverlayKey] = useState(0);
   const [previewPulse, setPreviewPulse] = useState(false);
+
+  /** Puntuación e incidencias alineadas con el texto que exportarías (vista previa + aprobaciones). */
+  const effectiveAnalysis = useMemo((): AnalysisResult | null => {
+    if (!analysis) return null;
+    if (!structuredPreview) return analysis;
+    const text = buildPlaintextFromStructured(structuredPreview, approvals);
+    return analyzeResumeText(text);
+  }, [analysis, structuredPreview, approvals]);
 
   // const [language, setLanguage] = useState<Language>('en');
   // const t = translations[language];
@@ -354,9 +365,7 @@ export default function App() {
       setApprovals(defaultApprovalsForCv(structured));
       setPersistFileKey(fileKeyFromFile(file));
       setPersistFileName(file.name);
-      toast.success(
-        replaceExisting ? 'Vista previa actualizada.' : 'Vista previa lista.',
-      );
+      toast.success(replaceExisting ? 'Vista previa actualizada.' : 'Vista previa lista.');
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Error al generar la vista previa.');
     } finally {
@@ -515,7 +524,7 @@ export default function App() {
   };
 
   return (
-    <div className="bg-background min-h-screen overflow-x-hidden">
+    <div className="bg-background min-h-screen overflow-x-clip">
       <Toaster position="bottom-right" richColors />
       <PreviewLoadingOverlay
         key={previewOverlayKey}
@@ -592,7 +601,7 @@ export default function App() {
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -40 }}
               transition={{ duration: 0.6 }}
-              className="from-muted/15 w-full bg-gradient-to-b to-background px-3 py-8 sm:px-5 sm:py-10 md:py-12 lg:px-8"
+              className="from-muted/15 to-background w-full bg-gradient-to-b px-3 py-8 sm:px-5 sm:py-10 md:py-12 lg:px-8"
               aria-live="polite"
             >
               <div
@@ -605,119 +614,144 @@ export default function App() {
                   {t.resultsWelcome}
                 </p>
 
-                <ATSScoreCard
-                  score={analysis.score}
-                  metrics={deriveAtsInsights(analysis.score, analysis.issues)}
-                  labels={{
-                    title: t.insightsTitle,
-                    readability: t.insightsReadability,
-                    keywords: t.insightsKeywords,
-                    formatting: t.insightsFormatting,
-                    experience: t.insightsExperience,
-                  }}
-                />
-
-                {analysis.issues.length === 0 ? (
-                  <motion.div
-                    initial={{ opacity: 0, y: 12 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className="border-border/60 bg-card/40 rounded-xl border px-4 py-3"
-                  >
-                    <h3 className="text-foreground mb-1 text-xs font-semibold uppercase tracking-wide">
-                      {t.issuesTitle}
-                    </h3>
-                    <p className="text-muted-foreground text-xs leading-relaxed">
-                      Sin incidencias automáticas. Ajusta palabras clave según cada oferta.
-                    </p>
-                  </motion.div>
-                ) : (
-                  <IssuesList issues={analysis.issues} title={t.issuesTitle} />
-                )}
-
-                <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-12">
-                  <div className="order-2 col-span-12 max-h-[calc(100vh-120px)] space-y-4 overflow-y-auto pr-1 lg:order-1 lg:col-span-5 [-ms-overflow-style:none] [scrollbar-width:thin] [&::-webkit-scrollbar]:w-1.5">
-                    <AISuggestionsPanel
-                      suggestions={analysis.suggestions}
-                      title={t.aiSuggestionsTitle}
-                      labels={{
-                        before: t.beforeTab,
-                        after: t.afterTab,
-                        apply: t.improvementApply,
-                        applied: t.improvementApplied,
-                      }}
-                      onApplyCopy={copySuggestionText}
-                    />
+                <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-12 lg:items-stretch">
+                  <div className="order-2 col-span-12 flex min-h-0 flex-col gap-4 lg:order-1 lg:col-span-5 lg:h-full">
+                    <div className="space-y-4 pr-2 transition-all duration-200 [-ms-overflow-style:none] [scrollbar-width:thin] lg:sticky lg:top-6 lg:max-h-[calc(100vh-32px)] lg:overflow-y-auto [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-stone-300 dark:[&::-webkit-scrollbar-thumb]:bg-stone-600">
+                      <AISuggestionsPanel
+                        suggestions={analysis.suggestions}
+                        title={t.aiSuggestionsTitle}
+                        labels={{
+                          before: t.beforeTab,
+                          after: t.afterTab,
+                          apply: t.improvementApply,
+                          applied: t.improvementApplied,
+                        }}
+                        onApplyCopy={copySuggestionText}
+                      />
+                      {effectiveAnalysis && effectiveAnalysis.issues.length === 0 ? (
+                        <motion.div
+                          initial={{ opacity: 0, y: 12 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          className="border-border/60 bg-card/40 rounded-xl border px-4 py-3"
+                        >
+                          <h3 className="text-foreground mb-1 text-xs font-semibold tracking-wide uppercase">
+                            {t.issuesTitle}
+                          </h3>
+                          <p className="text-muted-foreground text-xs leading-relaxed">
+                            Sin incidencias automáticas. Ajusta palabras clave según cada oferta.
+                          </p>
+                        </motion.div>
+                      ) : effectiveAnalysis ? (
+                        <IssuesList issues={effectiveAnalysis.issues} title={t.issuesTitle} />
+                      ) : null}
+                      {effectiveAnalysis ? (
+                        <div className="border-border/60 from-background/95 to-background/80 w-full rounded-2xl border bg-gradient-to-b shadow-sm ring-1 ring-black/[0.04] backdrop-blur-md dark:ring-white/[0.06]">
+                          <ATSScoreCard
+                            score={effectiveAnalysis.score}
+                            metrics={deriveAtsInsights(
+                              effectiveAnalysis.score,
+                              effectiveAnalysis.issues,
+                            )}
+                            labels={{
+                              title: t.insightsTitle,
+                              readability: t.insightsReadability,
+                              keywords: t.insightsKeywords,
+                              formatting: t.insightsFormatting,
+                              experience: t.insightsExperience,
+                            }}
+                          />
+                        </div>
+                      ) : null}
+                    </div>
                   </div>
 
-                  <div className="order-1 col-span-12 min-h-0 min-w-0 lg:order-2 lg:col-span-7">
-                    <div className="lg:sticky lg:top-6">
-                      <ResumePreview
-                        title={t.livePreviewTitle}
-                        subtitle={t.livePreviewSubtitle}
-                        highlightPulse={previewPulse}
-                        headerActions={
-                          <>
-                            {structuredPreview ? (
-                              <motion.button
-                                type="button"
-                                whileHover={{ scale: 1.02 }}
-                                whileTap={{ scale: 0.98 }}
-                                onClick={handleApplyAllImprovements}
-                                disabled={previewLoading}
-                                className="border-border/60 bg-background text-foreground hover:bg-muted/80 focus-visible:ring-primary inline-flex min-h-9 items-center gap-1.5 rounded-lg border px-3 text-xs font-semibold shadow-sm focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none disabled:opacity-50"
-                              >
-                                <Sparkles className="size-3.5" aria-hidden />
-                                {t.applyAllImprovements}
-                              </motion.button>
-                            ) : null}
+                  <div className="order-1 col-span-12 min-h-0 min-w-0 lg:order-2 lg:col-span-7 lg:h-full">
+                    <ResumePreview
+                      title={t.livePreviewTitle}
+                      subtitle={t.livePreviewSubtitle}
+                      highlightPulse={previewPulse}
+                      headerActions={
+                        <>
+                          {structuredPreview ? (
                             <motion.button
                               type="button"
-                              disabled={exportingFormat !== null || !uploadedFile}
-                              whileHover={{ scale: exportingFormat || !uploadedFile ? 1 : 1.02 }}
-                              whileTap={{ scale: exportingFormat || !uploadedFile ? 1 : 0.98 }}
-                              onClick={() => downloadImproved('pdf')}
-                              className="bg-primary text-primary-foreground focus-visible:ring-primary inline-flex min-h-9 items-center gap-1.5 rounded-lg px-3.5 text-xs font-semibold shadow-sm focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none disabled:opacity-50"
+                              whileHover={{ scale: 1.02 }}
+                              whileTap={{ scale: 0.98 }}
+                              onClick={handleApplyAllImprovements}
+                              disabled={previewLoading}
+                              className="border-border/60 bg-background text-foreground hover:bg-muted/80 focus-visible:ring-primary inline-flex min-h-9 items-center gap-1.5 rounded-lg border px-3 text-xs font-semibold shadow-sm focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none disabled:opacity-50"
                             >
-                              {exportingFormat === 'pdf' ? (
-                                <Loader2 className="size-3.5 animate-spin" aria-hidden />
-                              ) : (
-                                <Download className="size-3.5" aria-hidden />
-                              )}
-                              PDF
+                              <Sparkles className="size-3.5" aria-hidden />
+                              {t.applyAllImprovements}
                             </motion.button>
-                            <motion.button
-                              type="button"
-                              disabled={exportingFormat !== null || !uploadedFile}
-                              whileHover={{ scale: exportingFormat || !uploadedFile ? 1 : 1.02 }}
-                              whileTap={{ scale: exportingFormat || !uploadedFile ? 1 : 0.98 }}
-                              onClick={() => downloadImproved('docx')}
-                              className="border-border bg-background hover:bg-muted focus-visible:ring-primary inline-flex min-h-9 items-center gap-1.5 rounded-lg border px-3.5 text-xs font-semibold focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none disabled:opacity-50"
+                          ) : null}
+                          <motion.button
+                            type="button"
+                            disabled={exportingFormat !== null || !uploadedFile}
+                            whileHover={{ scale: exportingFormat || !uploadedFile ? 1 : 1.02 }}
+                            whileTap={{ scale: exportingFormat || !uploadedFile ? 1 : 0.98 }}
+                            onClick={() => downloadImproved('pdf')}
+                            className="bg-primary text-primary-foreground focus-visible:ring-primary inline-flex min-h-9 items-center gap-1.5 rounded-lg px-3.5 text-xs font-semibold shadow-sm focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none disabled:opacity-50"
+                          >
+                            {exportingFormat === 'pdf' ? (
+                              <Loader2 className="size-3.5 animate-spin" aria-hidden />
+                            ) : (
+                              <Download className="size-3.5" aria-hidden />
+                            )}
+                            PDF
+                          </motion.button>
+                          <motion.button
+                            type="button"
+                            disabled={exportingFormat !== null || !uploadedFile}
+                            whileHover={{ scale: exportingFormat || !uploadedFile ? 1 : 1.02 }}
+                            whileTap={{ scale: exportingFormat || !uploadedFile ? 1 : 0.98 }}
+                            onClick={() => downloadImproved('docx')}
+                            className="border-border bg-background hover:bg-muted focus-visible:ring-primary inline-flex min-h-9 items-center gap-1.5 rounded-lg border px-3.5 text-xs font-semibold focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none disabled:opacity-50"
+                          >
+                            {exportingFormat === 'docx' ? (
+                              <Loader2 className="size-3.5 animate-spin" aria-hidden />
+                            ) : (
+                              <Download className="size-3.5" aria-hidden />
+                            )}
+                            DOCX
+                          </motion.button>
+                        </>
+                      }
+                      meta={
+                        <>
+                          {!uploadedFile && structuredPreview && persistFileName ? (
+                            <div
+                              role="status"
+                              className="rounded-lg border border-amber-200/90 bg-amber-50/95 px-3 py-2 text-xs leading-relaxed text-amber-950"
                             >
-                              {exportingFormat === 'docx' ? (
-                                <Loader2 className="size-3.5 animate-spin" aria-hidden />
+                              {t.sessionRestoredBanner.replace('{name}', persistFileName)}
+                            </div>
+                          ) : null}
+                          <p className="text-muted-foreground text-sm leading-relaxed">
+                            {t.previewDescription}
+                          </p>
+                          {!(previewLoading && !structuredPreview) ? (
+                            <div className="flex flex-wrap gap-2">
+                              {!structuredPreview ? (
+                                <motion.button
+                                  type="button"
+                                  disabled={
+                                    previewLoading || exportingFormat !== null || !uploadedFile
+                                  }
+                                  whileHover={{ scale: previewLoading ? 1 : 1.01 }}
+                                  whileTap={{ scale: previewLoading ? 1 : 0.99 }}
+                                  onClick={handleGenerateOrRegeneratePreview}
+                                  className="bg-primary text-primary-foreground focus-visible:ring-primary inline-flex min-h-9 items-center gap-2 rounded-lg px-4 text-xs font-semibold shadow-sm focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none disabled:opacity-60"
+                                >
+                                  {previewLoading ? (
+                                    <Loader2 className="size-4 animate-spin" aria-hidden />
+                                  ) : (
+                                    <FileText className="size-4" aria-hidden />
+                                  )}
+                                  {previewLoading ? t.previewLoading : t.previewButtonGenerate}
+                                </motion.button>
                               ) : (
-                                <Download className="size-3.5" aria-hidden />
-                              )}
-                              DOCX
-                            </motion.button>
-                          </>
-                        }
-                        meta={
-                          <>
-                            {!uploadedFile && structuredPreview && persistFileName ? (
-                              <div
-                                role="status"
-                                className="border-amber-200/90 bg-amber-50/95 text-amber-950 rounded-lg border px-3 py-2 text-xs leading-relaxed"
-                              >
-                                {t.sessionRestoredBanner.replace('{name}', persistFileName)}
-                              </div>
-                            ) : null}
-                            <p className="text-muted-foreground text-sm leading-relaxed">
-                              {t.previewDescription}
-                            </p>
-                            {!(previewLoading && !structuredPreview) ? (
-                              <div className="flex flex-wrap gap-2">
-                                {!structuredPreview ? (
+                                <>
                                   <motion.button
                                     type="button"
                                     disabled={
@@ -726,102 +760,82 @@ export default function App() {
                                     whileHover={{ scale: previewLoading ? 1 : 1.01 }}
                                     whileTap={{ scale: previewLoading ? 1 : 0.99 }}
                                     onClick={handleGenerateOrRegeneratePreview}
-                                    className="bg-primary text-primary-foreground focus-visible:ring-primary inline-flex min-h-9 items-center gap-2 rounded-lg px-4 text-xs font-semibold shadow-sm focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none disabled:opacity-60"
+                                    className="border-border bg-background text-foreground hover:bg-muted focus-visible:ring-primary inline-flex min-h-9 items-center gap-2 rounded-lg border px-4 text-xs font-semibold focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none disabled:opacity-60"
                                   >
                                     {previewLoading ? (
                                       <Loader2 className="size-4 animate-spin" aria-hidden />
                                     ) : (
                                       <FileText className="size-4" aria-hidden />
                                     )}
-                                    {previewLoading ? t.previewLoading : t.previewButtonGenerate}
+                                    {previewLoading ? t.previewUpdating : t.previewButtonRegenerate}
                                   </motion.button>
-                                ) : (
-                                  <>
-                                    <motion.button
-                                      type="button"
-                                      disabled={
-                                        previewLoading || exportingFormat !== null || !uploadedFile
-                                      }
-                                      whileHover={{ scale: previewLoading ? 1 : 1.01 }}
-                                      whileTap={{ scale: previewLoading ? 1 : 0.99 }}
-                                      onClick={handleGenerateOrRegeneratePreview}
-                                      className="border-border bg-background text-foreground hover:bg-muted focus-visible:ring-primary inline-flex min-h-9 items-center gap-2 rounded-lg border px-4 text-xs font-semibold focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none disabled:opacity-60"
-                                    >
-                                      {previewLoading ? (
-                                        <Loader2 className="size-4 animate-spin" aria-hidden />
-                                      ) : (
-                                        <FileText className="size-4" aria-hidden />
-                                      )}
-                                      {previewLoading ? t.previewUpdating : t.previewButtonRegenerate}
-                                    </motion.button>
-                                    <motion.button
-                                      type="button"
-                                      disabled={previewLoading || exportingFormat !== null}
-                                      whileHover={{ scale: previewLoading ? 1 : 1.01 }}
-                                      whileTap={{ scale: previewLoading ? 1 : 0.99 }}
-                                      onClick={handleClearPreview}
-                                      className="text-foreground border-destructive/30 bg-background hover:bg-destructive/5 focus-visible:ring-destructive inline-flex min-h-9 items-center gap-2 rounded-lg border px-4 text-xs font-semibold focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none disabled:opacity-60"
-                                    >
-                                      <Trash2 className="size-4" aria-hidden />
-                                      {t.previewClear}
-                                    </motion.button>
-                                  </>
-                                )}
-                              </div>
-                            ) : null}
-                          </>
-                        }
-                      >
-                        {previewLoading && !structuredPreview ? (
-                          <div className="space-y-4 py-4" aria-busy="true">
-                            <Skeleton className="h-10 w-2/3 max-w-md" />
-                            <Skeleton className="h-4 w-full" />
-                            <Skeleton className="h-4 w-5/6" />
-                            <Skeleton className="h-40 w-full max-w-xl" />
-                            <Skeleton className="h-4 w-4/5" />
-                          </div>
-                        ) : null}
+                                  <motion.button
+                                    type="button"
+                                    disabled={previewLoading || exportingFormat !== null}
+                                    whileHover={{ scale: previewLoading ? 1 : 1.01 }}
+                                    whileTap={{ scale: previewLoading ? 1 : 0.99 }}
+                                    onClick={handleClearPreview}
+                                    className="text-foreground border-destructive/30 bg-background hover:bg-destructive/5 focus-visible:ring-destructive inline-flex min-h-9 items-center gap-2 rounded-lg border px-4 text-xs font-semibold focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none disabled:opacity-60"
+                                  >
+                                    <Trash2 className="size-4" aria-hidden />
+                                    {t.previewClear}
+                                  </motion.button>
+                                </>
+                              )}
+                            </div>
+                          ) : null}
+                        </>
+                      }
+                    >
+                      {previewLoading && !structuredPreview ? (
+                        <div className="space-y-4 py-4" aria-busy="true">
+                          <Skeleton className="h-10 w-2/3 max-w-md" />
+                          <Skeleton className="h-4 w-full" />
+                          <Skeleton className="h-4 w-5/6" />
+                          <Skeleton className="h-40 w-full max-w-xl" />
+                          <Skeleton className="h-4 w-4/5" />
+                        </div>
+                      ) : null}
 
-                        {!structuredPreview && !previewLoading ? (
-                          <div className="flex min-h-[50vh] flex-col items-center justify-center border border-dashed border-stone-200 bg-stone-50/50 px-6 py-16 text-center">
-                            <p className="text-foreground text-base font-semibold">
-                              {t.previewEmptyTitle}
-                            </p>
-                            <p className="text-muted-foreground mx-auto mt-3 max-w-md text-sm leading-relaxed">
-                              {t.previewEmptyHint}
-                            </p>
-                          </div>
-                        ) : null}
+                      {!structuredPreview && !previewLoading ? (
+                        <div className="flex min-h-[50vh] flex-col items-center justify-center border border-dashed border-stone-200 bg-stone-50/50 px-6 py-16 text-center">
+                          <p className="text-foreground text-base font-semibold">
+                            {t.previewEmptyTitle}
+                          </p>
+                          <p className="text-muted-foreground mx-auto mt-3 max-w-md text-sm leading-relaxed">
+                            {t.previewEmptyHint}
+                          </p>
+                        </div>
+                      ) : null}
 
-                        {structuredPreview ? (
-                          <motion.div
-                            key={`${previewPulse ? 'p' : 'n'}-${structuredPreview.header.name ?? 'cv'}`}
-                            className="transition-all duration-300"
-                            initial={{ opacity: 0.94 }}
-                            animate={{ opacity: 1 }}
-                            transition={{ duration: 0.35 }}
-                          >
-                            <ResumeHarvardPreview
-                              data={structuredPreview}
-                              approvals={approvals}
-                              onApprovalChange={handleApprovalChange}
-                              onStructuredChange={handleStructuredChange}
-                              language={language}
-                              readOnly={previewReadOnly}
-                              onReadOnlyChange={setPreviewReadOnly}
-                              baseline={structuredBaseline}
-                              onRevertAll={revertAllFromAi}
-                              onRevertSummary={revertSummaryFromAi}
-                              onRevertHeader={revertHeaderFromAi}
-                              onRevertExperience={revertExperienceFromAi}
-                              onRevertBullet={revertBulletFromAi}
-                              onRevertSkills={revertSkillsFromAi}
-                              onRevertEducation={revertEducationFromAi}
-                            />
-                          </motion.div>
-                        ) : null}
-                      </ResumePreview>
-                    </div>
+                      {structuredPreview ? (
+                        <motion.div
+                          key={`${previewPulse ? 'p' : 'n'}-${structuredPreview.header.name ?? 'cv'}`}
+                          className="transition-all duration-300"
+                          initial={{ opacity: 0.94 }}
+                          animate={{ opacity: 1 }}
+                          transition={{ duration: 0.35 }}
+                        >
+                          <ResumeHarvardPreview
+                            data={structuredPreview}
+                            approvals={approvals}
+                            onApprovalChange={handleApprovalChange}
+                            onStructuredChange={handleStructuredChange}
+                            language={language}
+                            readOnly={previewReadOnly}
+                            onReadOnlyChange={setPreviewReadOnly}
+                            baseline={structuredBaseline}
+                            onRevertAll={revertAllFromAi}
+                            onRevertSummary={revertSummaryFromAi}
+                            onRevertHeader={revertHeaderFromAi}
+                            onRevertExperience={revertExperienceFromAi}
+                            onRevertBullet={revertBulletFromAi}
+                            onRevertSkills={revertSkillsFromAi}
+                            onRevertEducation={revertEducationFromAi}
+                          />
+                        </motion.div>
+                      ) : null}
+                    </ResumePreview>
                   </div>
                 </div>
               </div>
@@ -838,9 +852,9 @@ export default function App() {
           className="mx-auto max-w-[min(100%,1200px)] px-5 py-10 pb-24 sm:px-8 sm:pb-28 md:py-14 md:pb-32"
           aria-labelledby="ats-explainer-heading"
         >
-          <div className="border-border/60 from-primary/[0.05] relative overflow-hidden rounded-2xl border bg-gradient-to-b to-card px-5 py-10 sm:px-8 md:py-14">
+          <div className="border-border/60 from-primary/[0.05] to-card relative overflow-hidden rounded-2xl border bg-gradient-to-b px-5 py-10 sm:px-8 md:py-14">
             <div
-              className="bg-primary/[0.07] pointer-events-none absolute -right-24 -top-24 size-72 rounded-full blur-3xl"
+              className="bg-primary/[0.07] pointer-events-none absolute -top-24 -right-24 size-72 rounded-full blur-3xl"
               aria-hidden
             />
             <motion.div
@@ -861,15 +875,15 @@ export default function App() {
                 <p>{t.atsExplainP2}</p>
                 <p>{t.atsExplainP3}</p>
               </div>
-              <details className="group border-border/50 text-muted-foreground mx-auto mt-8 max-w-3xl rounded-xl border bg-background/40 px-4 py-3 text-left sm:px-5 sm:py-4">
-                <summary className="text-primary hover:text-primary/90 [&::-webkit-details-marker]:hidden flex cursor-pointer list-none items-center justify-start gap-1.5 text-sm font-semibold transition-colors">
+              <details className="group border-border/50 text-muted-foreground bg-background/40 mx-auto mt-8 max-w-3xl rounded-xl border px-4 py-3 text-left sm:px-5 sm:py-4">
+                <summary className="text-primary hover:text-primary/90 flex cursor-pointer list-none items-center justify-start gap-1.5 text-sm font-semibold transition-colors [&::-webkit-details-marker]:hidden">
                   {t.atsReadMore}
                   <ChevronDown
                     className="size-4 shrink-0 opacity-70 transition-transform duration-200 group-open:rotate-180"
                     aria-hidden
                   />
                 </summary>
-                <div className="mt-5 space-y-4 border-t border-border/40 pt-5 text-base leading-relaxed md:text-[1.05rem]">
+                <div className="border-border/40 mt-5 space-y-4 border-t pt-5 text-base leading-relaxed md:text-[1.05rem]">
                   <p>{t.atsExplainP4}</p>
                   <p>{t.atsExplainP5}</p>
                   <p>{t.atsExplainP6}</p>
@@ -931,7 +945,7 @@ export default function App() {
                   href="https://www.rusmadrigal.com/es"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-primary font-medium underline decoration-primary/40 underline-offset-2 transition-colors hover:decoration-primary"
+                  className="text-primary decoration-primary/40 hover:decoration-primary font-medium underline underline-offset-2 transition-colors"
                 >
                   {t.authorName}
                 </Link>
