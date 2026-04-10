@@ -9,7 +9,11 @@ import { ScoreCard } from './components/ScoreCard';
 import { IssuesList } from './components/IssuesList';
 import { SuggestionCard } from './components/SuggestionCard';
 import { HowItWorksStep } from './components/HowItWorksStep';
+import { ResumeHarvardPreview } from './components/ResumeHarvardPreview';
 import type { AnalysisResult } from '@/src/lib/analysis-types';
+import { buildPlaintextFromStructured } from '@/src/lib/build-plaintext-from-structured';
+import type { CvApprovalMap, CvStructured } from '@/src/lib/cv-structured-types';
+import { defaultApprovalsForCv } from '@/src/lib/cv-structured-types';
 
 // type Language = 'en' | 'es';
 
@@ -70,7 +74,7 @@ const translations = {
     terms: 'Términos',
     exportBlockTitle: 'Descargar versión mejorada',
     exportBlockHint:
-      'El DOCX usa una plantilla fija con tu texto mejorado (docxtemplater). Si el servidor tiene Gotenberg o LibreOffice, el PDF se genera a partir de ese DOCX y conserva la maquetación de la plantilla; si no, se usa un PDF de texto plano como respaldo.',
+      'El DOCX usa una plantilla fija con tu texto mejorado (docxtemplater). Si generaste la vista previa Harvard, el archivo usa exactamente las mejoras que aprobaste. Si el servidor tiene Gotenberg o LibreOffice, el PDF sale del DOCX; si no, hay un PDF de texto plano como respaldo.',
     downloadDocx: 'DOCX con plantilla',
     downloadPdf: 'PDF (vía DOCX si hay conversor)',
     exportLoading: 'Generando…',
@@ -82,6 +86,13 @@ const translations = {
     useAiLabel: 'Reescribir con IA al exportar',
     useAiHint:
       'Usa OpenAI en el servidor (OPENAI_API_KEY). Si está desactivado, solo se aplican sustituciones heurísticas.',
+    previewTitle: 'Vista previa Harvard',
+    previewDescription:
+      'Genera una maquetación clara estilo Harvard con las propuestas de IA. Activa o desactiva cada mejora antes de descargar.',
+    previewButton: 'Generar vista previa con IA',
+    previewLoading: 'Generando vista previa…',
+    previewHint:
+      'Requiere OPENAI_API_KEY. El texto final del DOCX/PDF usará las mejoras que apruebes aquí.',
   },
 } as const;
 
@@ -99,6 +110,9 @@ export default function App() {
   const [exportingFormat, setExportingFormat] = useState<'docx' | 'pdf' | null>(null);
   const [exportSector, setExportSector] = useState<'default' | 'tech' | 'health'>('default');
   const [useExportAi, setUseExportAi] = useState(false);
+  const [structuredPreview, setStructuredPreview] = useState<CvStructured | null>(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const [approvals, setApprovals] = useState<CvApprovalMap>({});
 
   // const [language, setLanguage] = useState<Language>('en');
   // const t = translations[language];
@@ -114,6 +128,8 @@ export default function App() {
     setUploadedFile(file);
     setShowResults(false);
     setAnalysis(null);
+    setStructuredPreview(null);
+    setApprovals({});
     setIsAnalyzing(true);
     try {
       const body = new FormData();
@@ -145,6 +161,47 @@ export default function App() {
     }
   };
 
+  const handleGenerateHarvardPreview = async () => {
+    if (!uploadedFile) {
+      toast.error('Primero sube un CV.');
+      return;
+    }
+    setPreviewLoading(true);
+    try {
+      const body = new FormData();
+      body.append('file', uploadedFile);
+      const res = await fetch('/api/improve-preview', { method: 'POST', body });
+      const data: unknown = await res.json();
+      if (!res.ok) {
+        const msg =
+          typeof data === 'object' && data !== null && 'error' in data
+            ? String((data as { error: unknown }).error)
+            : 'No se pudo generar la vista previa.';
+        throw new Error(msg);
+      }
+      if (
+        typeof data !== 'object' ||
+        data === null ||
+        !('structured' in data) ||
+        (data as { structured: unknown }).structured === null
+      ) {
+        throw new Error('Respuesta de vista previa no válida.');
+      }
+      const structured = (data as { structured: CvStructured }).structured;
+      setStructuredPreview(structured);
+      setApprovals(defaultApprovalsForCv(structured));
+      toast.success('Vista previa lista');
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Error al generar la vista previa.');
+    } finally {
+      setPreviewLoading(false);
+    }
+  };
+
+  const handleApprovalChange = (key: string, accepted: boolean) => {
+    setApprovals((prev) => ({ ...prev, [key]: accepted }));
+  };
+
   const downloadImproved = async (format: 'docx' | 'pdf') => {
     if (!uploadedFile) {
       toast.error('Primero sube un CV.');
@@ -156,7 +213,12 @@ export default function App() {
       body.append('file', uploadedFile);
       body.append('format', format);
       body.append('sector', exportSector);
-      body.append('useAi', useExportAi ? 'true' : 'false');
+      if (structuredPreview && Object.keys(approvals).length > 0) {
+        body.append('improvedText', buildPlaintextFromStructured(structuredPreview, approvals));
+        body.append('useAi', 'false');
+      } else {
+        body.append('useAi', useExportAi ? 'true' : 'false');
+      }
       const res = await fetch('/api/export-improved', { method: 'POST', body });
       if (!res.ok) {
         const data: unknown = await res.json().catch(() => ({}));
@@ -316,6 +378,46 @@ export default function App() {
                     title={t.suggestionsTitle}
                     language={language}
                   />
+
+                  <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.55, delay: 0.08 }}
+                    className="bg-card border-border rounded-2xl border p-8 shadow-sm"
+                  >
+                    <h3 className="text-foreground mb-2 text-lg font-semibold md:text-xl">
+                      {t.previewTitle}
+                    </h3>
+                    <p className="text-muted-foreground mb-6 text-sm leading-relaxed md:text-base">
+                      {t.previewDescription}
+                    </p>
+                    <p className="text-muted-foreground mb-4 text-xs leading-relaxed">{t.previewHint}</p>
+                    <motion.button
+                      type="button"
+                      disabled={previewLoading || exportingFormat !== null}
+                      whileHover={{ scale: previewLoading ? 1 : 1.02 }}
+                      whileTap={{ scale: previewLoading ? 1 : 0.98 }}
+                      onClick={handleGenerateHarvardPreview}
+                      className="bg-primary text-primary-foreground focus-visible:ring-primary inline-flex items-center justify-center gap-2 rounded-xl px-6 py-3 text-sm font-semibold focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none disabled:opacity-60"
+                    >
+                      {previewLoading ? (
+                        <Loader2 className="h-5 w-5 animate-spin" aria-hidden />
+                      ) : (
+                        <FileText className="h-5 w-5" aria-hidden />
+                      )}
+                      {previewLoading ? t.previewLoading : t.previewButton}
+                    </motion.button>
+                    {structuredPreview ? (
+                      <div className="mt-10">
+                        <ResumeHarvardPreview
+                          data={structuredPreview}
+                          approvals={approvals}
+                          onApprovalChange={handleApprovalChange}
+                          language={language}
+                        />
+                      </div>
+                    ) : null}
+                  </motion.div>
 
                   <motion.div
                     initial={{ opacity: 0, y: 20 }}

@@ -45,8 +45,11 @@ export async function POST(request: Request) {
     const text = await extractResumeText(buffer, file.type);
     const analysis = analyzeResumeText(text);
 
+    const improvedTextOverride = form.get('improvedText');
     let improved: string;
-    if (useAi) {
+    if (typeof improvedTextOverride === 'string' && improvedTextOverride.trim().length > 40) {
+      improved = improvedTextOverride.trim();
+    } else if (useAi) {
       improved = await improveCvTextWithAi({
         extractedText: text,
         issues: analysis.issues,
