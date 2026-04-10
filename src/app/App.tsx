@@ -3,12 +3,13 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Upload, CheckCircle, FileText, Zap, TrendingUp } from 'lucide-react';
-import { Toaster } from 'sonner';
+import { Toaster, toast } from 'sonner';
 import { UploadDropzone } from './components/UploadDropzone';
 import { ScoreCard } from './components/ScoreCard';
 import { IssuesList } from './components/IssuesList';
 import { SuggestionCard } from './components/SuggestionCard';
 import { HowItWorksStep } from './components/HowItWorksStep';
+import type { AnalysisResult } from '@/src/lib/analysis-types';
 
 // type Language = 'en' | 'es';
 
@@ -74,9 +75,13 @@ const t = translations.es;
 /** Idioma fijo: español. Reactivar `en` arriba y estado `language` para volver al toggle. */
 const language = 'es' as const;
 
+const MAX_FILE_BYTES = 10 * 1024 * 1024;
+
 export default function App() {
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
   const [showResults, setShowResults] = useState(false);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [analysis, setAnalysis] = useState<AnalysisResult | null>(null);
 
   // const [language, setLanguage] = useState<Language>('en');
   // const t = translations[language];
@@ -84,38 +89,44 @@ export default function App() {
   //   setLanguage(language === 'en' ? 'es' : 'en');
   // };
 
-  const handleFileUpload = (file: File) => {
+  const handleFileSelect = async (file: File) => {
+    if (file.size > MAX_FILE_BYTES) {
+      toast.error('El archivo supera el límite de 10 MB.');
+      return;
+    }
     setUploadedFile(file);
-    setTimeout(() => {
+    setShowResults(false);
+    setAnalysis(null);
+    setIsAnalyzing(true);
+    try {
+      const body = new FormData();
+      body.append('file', file);
+      const res = await fetch('/api/analyze', { method: 'POST', body });
+      const data: unknown = await res.json();
+      if (!res.ok) {
+        const msg =
+          typeof data === 'object' && data !== null && 'error' in data
+            ? String((data as { error: unknown }).error)
+            : 'No se pudo analizar el CV.';
+        throw new Error(msg);
+      }
+      const result = data as AnalysisResult;
+      if (
+        typeof result.score !== 'number' ||
+        !Array.isArray(result.issues) ||
+        !Array.isArray(result.suggestions)
+      ) {
+        throw new Error('Respuesta del servidor no válida.');
+      }
+      setAnalysis(result);
       setShowResults(true);
-    }, 1500);
+    } catch (e) {
+      const message = e instanceof Error ? e.message : 'Error al analizar el CV.';
+      toast.error(message);
+    } finally {
+      setIsAnalyzing(false);
+    }
   };
-
-  const mockIssues: Array<{ type: 'error' | 'warning'; text: string }> = [
-    {
-      type: 'error',
-      text: 'Falta información de contacto en el encabezado',
-      // en: 'Missing contact information in header',
-    },
-    {
-      type: 'warning',
-      text: 'Usa más palabras clave específicas de la industria',
-      // en: 'Use more industry-specific keywords',
-    },
-    {
-      type: 'warning',
-      text: 'La sección de experiencia podría ser más cuantificable',
-      // en: 'Experience section could be more quantifiable',
-    },
-  ];
-
-  const mockSuggestions: Array<{ original: string; improved: string }> = [
-    {
-      original: 'Managed team projects',
-      improved:
-        'Led cross-functional team of 8 engineers, delivering 12+ projects on schedule with 95% stakeholder satisfaction',
-    },
-  ];
 
   return (
     <div className="bg-background min-h-screen">
@@ -186,7 +197,11 @@ export default function App() {
                 animate={{ y: 0, opacity: 1 }}
                 transition={{ duration: 0.8, delay: 0.5 }}
               >
-                <UploadDropzone onFileUpload={handleFileUpload} language={language} />
+                <UploadDropzone
+                  onFileSelect={handleFileSelect}
+                  isAnalyzing={isAnalyzing}
+                  language={language}
+                />
               </motion.div>
 
               {uploadedFile && (
@@ -205,7 +220,7 @@ export default function App() {
 
         {/* Results Section */}
         <AnimatePresence>
-          {showResults && (
+          {showResults && analysis && (
             <motion.section
               initial={{ opacity: 0, y: 40 }}
               animate={{ opacity: 1, y: 0 }}
@@ -217,14 +232,30 @@ export default function App() {
               <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
                 {/* Score Card */}
                 <div className="lg:col-span-1">
-                  <ScoreCard score={78} language={language} />
+                  <ScoreCard score={analysis.score} language={language} />
                 </div>
 
                 {/* Issues and Suggestions */}
                 <div className="space-y-6 lg:col-span-2">
-                  <IssuesList issues={mockIssues} title={t.issuesTitle} />
+                  {analysis.issues.length === 0 ? (
+                    <motion.div
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className="bg-card border-border rounded-2xl border p-8 shadow-sm"
+                    >
+                      <h3 className="text-foreground mb-2 text-lg font-semibold md:text-xl">
+                        {t.issuesTitle}
+                      </h3>
+                      <p className="text-muted-foreground text-sm leading-relaxed md:text-base">
+                        No se detectaron incidencias con las comprobaciones automáticas. Sigue
+                        afinando palabras clave según cada oferta.
+                      </p>
+                    </motion.div>
+                  ) : (
+                    <IssuesList issues={analysis.issues} title={t.issuesTitle} />
+                  )}
                   <SuggestionCard
-                    suggestions={mockSuggestions}
+                    suggestions={analysis.suggestions}
                     title={t.suggestionsTitle}
                     language={language}
                   />

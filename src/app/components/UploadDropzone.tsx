@@ -3,13 +3,13 @@ import { motion } from 'motion/react';
 import { Upload, FileText, Loader2 } from 'lucide-react';
 
 interface UploadDropzoneProps {
-  onFileUpload: (file: File) => void;
+  onFileSelect: (file: File) => void;
+  isAnalyzing: boolean;
   language: 'en' | 'es';
 }
 
-export function UploadDropzone({ onFileUpload, language }: UploadDropzoneProps) {
+export function UploadDropzone({ onFileSelect, isAnalyzing, language }: UploadDropzoneProps) {
   const [isDragging, setIsDragging] = useState(false);
-  const [isUploading, setIsUploading] = useState(false);
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -32,28 +32,20 @@ export function UploadDropzone({ onFileUpload, language }: UploadDropzoneProps) 
         (file.type === 'application/pdf' ||
           file.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document')
       ) {
-        setIsUploading(true);
-        setTimeout(() => {
-          onFileUpload(file);
-          setIsUploading(false);
-        }, 1000);
+        onFileSelect(file);
       }
     },
-    [onFileUpload],
+    [onFileSelect],
   );
 
   const handleFileInput = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
       const file = e.target.files?.[0];
       if (file) {
-        setIsUploading(true);
-        setTimeout(() => {
-          onFileUpload(file);
-          setIsUploading(false);
-        }, 1000);
+        onFileSelect(file);
       }
     },
-    [onFileUpload],
+    [onFileSelect],
   );
 
   const text = {
@@ -89,7 +81,7 @@ export function UploadDropzone({ onFileUpload, language }: UploadDropzoneProps) 
       }`}
     >
       <div className="flex flex-col items-center justify-center gap-6">
-        {isUploading ? (
+        {isAnalyzing ? (
           <motion.div
             initial={{ opacity: 0, scale: 0.8 }}
             animate={{ opacity: 1, scale: 1 }}
