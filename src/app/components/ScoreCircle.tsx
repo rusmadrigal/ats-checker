@@ -8,9 +8,17 @@ type ScoreCircleProps = {
   max?: number;
   size?: 'md' | 'lg';
   className?: string;
+  /** Classes for the numeric score (e.g. transition). */
+  scoreNumberClassName?: string;
 };
 
-export function ScoreCircle({ score, max = 100, size = 'lg', className }: ScoreCircleProps) {
+export function ScoreCircle({
+  score,
+  max = 100,
+  size = 'lg',
+  className,
+  scoreNumberClassName,
+}: ScoreCircleProps) {
   const r = size === 'lg' ? 52 : 42;
   const stroke = size === 'lg' ? 8 : 7;
   const c = 2 * Math.PI * r;
@@ -43,15 +51,20 @@ export function ScoreCircle({ score, max = 100, size = 'lg', className }: ScoreC
           strokeWidth={stroke}
           strokeLinecap="round"
           stroke="currentColor"
-          className={good ? 'text-emerald-500' : 'text-amber-500'}
+          className={cn(good ? 'text-emerald-500' : 'text-amber-500', 'transition-all duration-500')}
           initial={{ strokeDashoffset: c }}
           animate={{ strokeDashoffset: offset }}
-          transition={{ duration: 1.2, ease: [0.22, 1, 0.36, 1] }}
+          transition={{ duration: 0.85, ease: [0.22, 1, 0.36, 1] }}
           style={{ strokeDasharray: c }}
         />
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center">
-        <span className="text-foreground text-3xl font-semibold tabular-nums tracking-tight sm:text-4xl">
+        <span
+          className={cn(
+            'text-foreground text-3xl font-semibold tabular-nums tracking-tight transition-all duration-500 sm:text-4xl',
+            scoreNumberClassName,
+          )}
+        >
           {score}
         </span>
         <span className="text-muted-foreground mt-0.5 text-[10px] font-medium uppercase tracking-wider sm:text-xs">

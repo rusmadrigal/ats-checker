@@ -17,7 +17,7 @@ import {
 } from 'lucide-react';
 import { Toaster, toast } from 'sonner';
 import { PreviewLoadingOverlay } from './components/PreviewLoadingOverlay';
-import { IssuesList } from './components/IssuesList';
+import { IssuesList, IssuesListFixWithAiButton } from './components/IssuesList';
 import { HowItWorksStep } from './components/HowItWorksStep';
 import { ResumeHarvardPreview } from './components/ResumeHarvardPreview';
 import { HeroAIAnalysis } from './components/HeroAIAnalysis';
@@ -25,10 +25,12 @@ import { ATSScoreCard } from './components/ATSScoreCard';
 import { AISuggestionsPanel } from './components/AISuggestionsPanel';
 import { ResumePreview } from './components/ResumePreview';
 import { Skeleton } from './components/ui/skeleton';
-import { deriveAtsInsights } from '@/src/lib/ats-score-insights';
+import { deriveAtsInsights, type AtsInsightMetrics } from '@/src/lib/ats-score-insights';
 import { analyzeResumeText } from '@/src/lib/analyze-resume-heuristics';
-import type { AnalysisResult } from '@/src/lib/analysis-types';
+import type { AnalysisIssue, AnalysisResult } from '@/src/lib/analysis-types';
 import { buildPlaintextFromStructured } from '@/src/lib/build-plaintext-from-structured';
+import { buildSectionsOutline } from '@/src/lib/build-sections-outline';
+import type { AiRescoreResult } from '@/src/lib/re-score-resume-ai';
 import type { CvApprovalMap, CvStructured } from '@/src/lib/cv-structured-types';
 import { defaultApprovalsForCv } from '@/src/lib/cv-structured-types';
 import { cloneCvStructured } from '@/src/lib/cv-structured-clone';
@@ -159,6 +161,10 @@ const translations = {
     applyAllToast: 'Cambios de IA aplicados en la vista previa.',
     beforeTab: 'Antes',
     afterTab: 'Después',
+    fixIssuesWithAi: 'Corregir problemas con IA',
+    fixIssuesLoading: 'Aplicando correcciones…',
+    fixIssuesSuccess: 'Listo: el CV se actualizó según los problemas detectados. Revísalo en la vista previa.',
+    fixIssuesError: 'No se pudo aplicar las correcciones. Revisa tu clave de OpenAI o inténtalo de nuevo.',
   },
 } as const;
 
@@ -167,6 +173,17 @@ const t = translations.es;
 const language = 'es' as const;
 
 const MAX_FILE_BYTES = 10 * 1024 * 1024;
+
+function issueTypeFromAiText(text: string): AnalysisIssue['type'] {
+  if (
+    /\bfalta\b|\bno (hay|se detect|aparece)\b|\bmissing\b|\bsin email\b|\bsin contacto\b/i.test(
+      text,
+    )
+  ) {
+    return 'error';
+  }
+  return 'warning';
+}
 
 export default function App() {
   const pathname = usePathname();
@@ -190,6 +207,12 @@ export default function App() {
   /** Remonta el overlay de tips cada vez que arranca una nueva generación de vista previa. */
   const [previewOverlayKey, setPreviewOverlayKey] = useState(0);
   const [previewPulse, setPreviewPulse] = useState(false);
+  const [aiLive, setAiLive] = useState<AiRescoreResult | null>(null);
+  const [aiLivePending, setAiLivePending] = useState(false);
+  const [fixIssuesLoading, setFixIssuesLoading] = useState(false);
+  const aiRescoreRequestId = useRef(0);
+  const lastAiScoreRef = useRef<number | null>(null);
+  const aiFetchAbortRef = useRef<AbortController | null>(null);
 
   /** Puntuación e incidencias alineadas con el texto que exportarías (vista previa + aprobaciones). */
   const effectiveAnalysis = useMemo((): AnalysisResult | null => {
@@ -198,6 +221,115 @@ export default function App() {
     const text = buildPlaintextFromStructured(structuredPreview, approvals);
     return analyzeResumeText(text);
   }, [analysis, structuredPreview, approvals]);
+
+  const displayIssues = useMemo((): AnalysisIssue[] => {
+    if (!effectiveAnalysis) return [];
+    if (structuredPreview && aiLive) {
+      return aiLive.issues.map((text) => ({
+        type: issueTypeFromAiText(text),
+        text,
+      }));
+    }
+    return effectiveAnalysis.issues;
+  }, [effectiveAnalysis, structuredPreview, aiLive]);
+
+  const displayScore = aiLive && structuredPreview ? aiLive.score : (effectiveAnalysis?.score ?? 0);
+
+  const displayMetrics = useMemo((): AtsInsightMetrics => {
+    if (!effectiveAnalysis) {
+      return { readability: 0, keywords: 0, formatting: 0, experienceClarity: 0 };
+    }
+    if (structuredPreview && aiLive) {
+      return {
+        readability: aiLive.readability,
+        keywords: aiLive.keywords,
+        formatting: aiLive.formatting,
+        experienceClarity: aiLive.experience,
+      };
+    }
+    return deriveAtsInsights(effectiveAnalysis.score, effectiveAnalysis.issues);
+  }, [effectiveAnalysis, structuredPreview, aiLive]);
+
+  useEffect(() => {
+    if (!structuredPreview || !analysis) {
+      aiFetchAbortRef.current?.abort();
+      aiFetchAbortRef.current = null;
+      setAiLive(null);
+      lastAiScoreRef.current = null;
+      setAiLivePending(false);
+      return;
+    }
+
+    const text = buildPlaintextFromStructured(structuredPreview, approvals).trim();
+    if (text.length < 40) {
+      aiFetchAbortRef.current?.abort();
+      aiFetchAbortRef.current = null;
+      return;
+    }
+
+    const debounce = window.setTimeout(() => {
+      aiFetchAbortRef.current?.abort();
+      const ac = new AbortController();
+      aiFetchAbortRef.current = ac;
+      const requestId = ++aiRescoreRequestId.current;
+      setAiLivePending(true);
+
+      const previousScore =
+        lastAiScoreRef.current !== null ? lastAiScoreRef.current : analysis.score;
+
+      void (async () => {
+        try {
+          const res = await fetch('/api/re-score-resume', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              resumeText: text,
+              previousScore: Math.round(previousScore),
+              sectionsOutline: buildSectionsOutline(structuredPreview),
+            }),
+            signal: ac.signal,
+          });
+          const data: unknown = await res.json();
+          if (requestId !== aiRescoreRequestId.current) return;
+          if (!res.ok) {
+            setAiLive(null);
+            return;
+          }
+          const r = data as Partial<AiRescoreResult>;
+          if (typeof r.score !== 'number') {
+            setAiLive(null);
+            return;
+          }
+          setAiLive({
+            score: r.score,
+            delta: typeof r.delta === 'number' ? r.delta : 0,
+            readability: typeof r.readability === 'number' ? r.readability : r.score,
+            keywords: typeof r.keywords === 'number' ? r.keywords : r.score,
+            formatting: typeof r.formatting === 'number' ? r.formatting : r.score,
+            experience: typeof r.experience === 'number' ? r.experience : r.score,
+            issues: Array.isArray(r.issues) ? r.issues : [],
+            improvements: Array.isArray(r.improvements) ? r.improvements : [],
+          });
+          lastAiScoreRef.current = r.score;
+        } catch (e) {
+          if (e instanceof Error && e.name === 'AbortError') return;
+          if (requestId !== aiRescoreRequestId.current) return;
+          setAiLive(null);
+        } finally {
+          if (requestId === aiRescoreRequestId.current) {
+            setAiLivePending(false);
+          }
+        }
+      })();
+    }, 500);
+
+    return () => {
+      window.clearTimeout(debounce);
+      aiFetchAbortRef.current?.abort();
+      aiFetchAbortRef.current = null;
+      setAiLivePending(false);
+    };
+  }, [structuredPreview, approvals, analysis]);
 
   // const [language, setLanguage] = useState<Language>('en');
   // const t = translations[language];
@@ -214,6 +346,8 @@ export default function App() {
     setStructuredPreview(p.structured);
     setStructuredBaseline(cloneCvStructured(p.baseline));
     setApprovals(p.approvals);
+    setAiLive(null);
+    lastAiScoreRef.current = null;
     setPreviewReadOnly(p.previewReadOnly);
     setPersistFileKey(p.fileKey);
     setPersistFileName(p.fileName);
@@ -265,6 +399,8 @@ export default function App() {
     setPreviewReadOnly(false);
     setPersistFileKey(null);
     setPersistFileName(null);
+    setAiLive(null);
+    lastAiScoreRef.current = null;
     toast.success('Vista previa eliminada. Generar de nuevo usará la IA (tokens).');
   };
 
@@ -314,6 +450,8 @@ export default function App() {
         throw new Error('Respuesta del servidor no válida.');
       }
       setAnalysis(result);
+      setAiLive(null);
+      lastAiScoreRef.current = null;
       setShowResults(true);
       setResultsScrollToken((n) => n + 1);
       setPersistFileKey(nextKey);
@@ -397,6 +535,54 @@ export default function App() {
     setPreviewPulse(true);
     toast.success(t.applyAllToast);
     window.setTimeout(() => setPreviewPulse(false), 1800);
+  };
+
+  const handleFixIssuesWithAi = async () => {
+    if (!structuredPreview || displayIssues.length === 0) return;
+    setFixIssuesLoading(true);
+    setAiLive(null);
+    setAiLivePending(false);
+    aiRescoreRequestId.current += 1;
+    aiFetchAbortRef.current?.abort();
+    aiFetchAbortRef.current = null;
+    try {
+      const res = await fetch('/api/fix-cv-issues', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          structured: structuredPreview,
+          issues: displayIssues.map((i) => i.text),
+        }),
+      });
+      const data: unknown = await res.json();
+      if (!res.ok) {
+        const msg =
+          typeof data === 'object' && data !== null && 'error' in data
+            ? String((data as { error: unknown }).error)
+            : t.fixIssuesError;
+        throw new Error(msg);
+      }
+      if (
+        typeof data !== 'object' ||
+        data === null ||
+        !('structured' in data) ||
+        (data as { structured: unknown }).structured === null
+      ) {
+        throw new Error(t.fixIssuesError);
+      }
+      const next = (data as { structured: CvStructured }).structured;
+      setStructuredPreview(next);
+      setApprovals(defaultApprovalsForCv(next));
+      setAiLive(null);
+      aiRescoreRequestId.current += 1;
+      aiFetchAbortRef.current?.abort();
+      aiFetchAbortRef.current = null;
+      toast.success(t.fixIssuesSuccess);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : t.fixIssuesError);
+    } finally {
+      setFixIssuesLoading(false);
+    }
   };
 
   const handleApprovalChange = (key: string, accepted: boolean) => {
@@ -628,7 +814,7 @@ export default function App() {
                         }}
                         onApplyCopy={copySuggestionText}
                       />
-                      {effectiveAnalysis && effectiveAnalysis.issues.length === 0 ? (
+                      {effectiveAnalysis && displayIssues.length === 0 ? (
                         <motion.div
                           initial={{ opacity: 0, y: 12 }}
                           animate={{ opacity: 1, y: 0 }}
@@ -642,16 +828,40 @@ export default function App() {
                           </p>
                         </motion.div>
                       ) : effectiveAnalysis ? (
-                        <IssuesList issues={effectiveAnalysis.issues} title={t.issuesTitle} />
+                        <IssuesList
+                          key={displayIssues
+                            .map((i) => i.text)
+                            .join('|')
+                            .slice(0, 120)}
+                          issues={displayIssues}
+                          title={t.issuesTitle}
+                          footer={
+                            structuredPreview ? (
+                              <IssuesListFixWithAiButton
+                                label={t.fixIssuesWithAi}
+                                loadingLabel={t.fixIssuesLoading}
+                                onClick={() => void handleFixIssuesWithAi()}
+                                disabled={
+                                  previewLoading || fixIssuesLoading || exportingFormat !== null
+                                }
+                                loading={fixIssuesLoading}
+                              />
+                            ) : null
+                          }
+                        />
                       ) : null}
                       {effectiveAnalysis ? (
                         <div className="border-border/60 from-background/95 to-background/80 w-full rounded-2xl border bg-gradient-to-b shadow-sm ring-1 ring-black/[0.04] backdrop-blur-md dark:ring-white/[0.06]">
                           <ATSScoreCard
-                            score={effectiveAnalysis.score}
-                            metrics={deriveAtsInsights(
-                              effectiveAnalysis.score,
-                              effectiveAnalysis.issues,
-                            )}
+                            score={displayScore}
+                            metrics={displayMetrics}
+                            scoreDelta={structuredPreview && aiLive ? aiLive.delta : null}
+                            isUpdating={Boolean(structuredPreview && aiLivePending)}
+                            improvementHints={
+                              structuredPreview && aiLive && aiLive.improvements.length > 0
+                                ? aiLive.improvements
+                                : undefined
+                            }
                             labels={{
                               title: t.insightsTitle,
                               readability: t.insightsReadability,
@@ -810,7 +1020,7 @@ export default function App() {
 
                       {structuredPreview ? (
                         <motion.div
-                          key={`${previewPulse ? 'p' : 'n'}-${structuredPreview.header.name ?? 'cv'}`}
+                          key={persistFileKey ?? 'resume-preview'}
                           className="transition-all duration-300"
                           initial={{ opacity: 0.94 }}
                           animate={{ opacity: 1 }}

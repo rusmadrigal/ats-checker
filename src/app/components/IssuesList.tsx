@@ -1,5 +1,6 @@
+import type { ReactNode } from 'react';
 import { motion } from 'motion/react';
-import { AlertCircle, AlertTriangle } from 'lucide-react';
+import { AlertCircle, AlertTriangle, Loader2, Sparkles } from 'lucide-react';
 
 interface Issue {
   type: 'error' | 'warning';
@@ -9,9 +10,11 @@ interface Issue {
 interface IssuesListProps {
   issues: Issue[];
   title: string;
+  /** Botón opcional bajo la lista (p. ej. corregir con IA). */
+  footer?: ReactNode;
 }
 
-export function IssuesList({ issues, title }: IssuesListProps) {
+export function IssuesList({ issues, title, footer }: IssuesListProps) {
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -47,6 +50,41 @@ export function IssuesList({ issues, title }: IssuesListProps) {
           </motion.div>
         ))}
       </div>
+      {footer ? <div className="border-border/50 mt-4 border-t pt-4">{footer}</div> : null}
     </motion.div>
+  );
+}
+
+type IssuesListFixWithAiButtonProps = {
+  label: string;
+  loadingLabel: string;
+  onClick: () => void;
+  disabled?: boolean;
+  loading?: boolean;
+};
+
+export function IssuesListFixWithAiButton({
+  label,
+  loadingLabel,
+  onClick,
+  disabled = false,
+  loading = false,
+}: IssuesListFixWithAiButtonProps) {
+  return (
+    <motion.button
+      type="button"
+      whileHover={{ scale: disabled || loading ? 1 : 1.01 }}
+      whileTap={{ scale: disabled || loading ? 1 : 0.99 }}
+      onClick={onClick}
+      disabled={disabled || loading}
+      className="bg-primary text-primary-foreground focus-visible:ring-primary inline-flex w-full min-h-10 items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-xs font-semibold shadow-sm transition-colors focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none disabled:opacity-55"
+    >
+      {loading ? (
+        <Loader2 className="size-4 shrink-0 animate-spin" aria-hidden />
+      ) : (
+        <Sparkles className="size-4 shrink-0" aria-hidden />
+      )}
+      {loading ? loadingLabel : label}
+    </motion.button>
   );
 }

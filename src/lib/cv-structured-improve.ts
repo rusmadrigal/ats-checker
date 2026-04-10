@@ -2,10 +2,7 @@ import { createOpenAI } from '@ai-sdk/openai';
 import { generateObject } from 'ai';
 import { AiImprovementError } from './improve-text-ai';
 import { cvStructuredSchema, type CvStructured } from './cv-structured-types';
-
-function resolveModelId(): string {
-  return process.env.OPENAI_MODEL?.trim() || 'gpt-4o-mini';
-}
+import { resolveOpenAiModelId } from './openai-model';
 
 export async function improveCvStructuredWithAi(input: {
   extractedText: string;
@@ -18,7 +15,7 @@ export async function improveCvStructuredWithAi(input: {
   }
 
   const openai = createOpenAI({ apiKey });
-  const modelId = resolveModelId();
+  const modelId = resolveOpenAiModelId();
 
   const { object } = await generateObject({
     model: openai(modelId),
@@ -26,6 +23,14 @@ export async function improveCvStructuredWithAi(input: {
     system: `Eres editor senior de CV, experto en ATS y en formato Harvard (claro, sobrio, sin adornos).
 Extraes datos SOLO del texto del usuario. No inventes empresas, fechas, titulaciones ni logros.
 Puedes reformular con verbos de acción y claridad; añade métricas solo si el texto original las sugiere o permite inferirlas sin inventar cifras nuevas.
+
+ATENCIÓN AL DETALLE (obligatorio):
+- header.name: transcribe el nombre como en el CV. Si está vacío, falta del todo o es un marcador (p. ej. "Tu nombre", "Nombre apellido"), deja name vacío o el texto literal y menciona el problema en ats.improvements (mismo idioma que el CV).
+- Si detectas error ortográfico claro en un nombre propio (doble letra, letra faltante evidente) sin poder saber el nombre correcto real, conserva lo que dice el usuario; si el error es obvio y la corrección es única (p. ej. "Pedrro"→"Pedro"), puedes corregir en header.name e indicar en changes del resumen o ats.improvements.
+- email: si es inválido, incompleto o placeholder, no inventes uno; refleja el estado y anótalo en ats.improvements.
+- title y summary: detecta mayúsculas sostenidas innecesarias, titular vacío con experiencia larga, resumen demasiado corto o solo lugares comunes; mejora en improved y resume en changes/ats.
+- experience: fechas incoherentes, viñetas vacías de impacto, verbos inconsistentes; mejora sin inventar cargos.
+- Coherencia global: mismo apellido, fechas que no se contradicen entre secciones.
 
 IDIOMA (obligatorio, sin excepciones): TODAS las cadenas que generes (improved, changes, skills, ats.improvements, etc.) deben estar en el mismo idioma que el CV de entrada. Si el CV está en inglés, todo en inglés; si en español, todo en español. Si es bilingüe con secciones claras, conserva el idioma de cada parte como en el original—nunca traduzcas el contenido a otro idioma.
 meta: layout "two-column", style "harvard", font "Georgia", accentColor "#1e3a5f".
