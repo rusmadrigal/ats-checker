@@ -67,9 +67,10 @@ const resumeInput =
   'border-stone-200/90 bg-white text-foreground shadow-none focus-visible:border-stone-400 focus-visible:ring-2 focus-visible:ring-stone-300/30';
 
 const resumeTextarea =
-  'min-h-[4.5rem] resize-y border-stone-200/90 bg-white text-[15px] leading-relaxed shadow-none focus-visible:border-stone-400 focus-visible:ring-2 focus-visible:ring-stone-300/30 md:text-[15px]';
+  'min-h-[5rem] resize-y border-stone-200/90 bg-white text-[16px] leading-relaxed shadow-none focus-visible:border-stone-400 focus-visible:ring-2 focus-visible:ring-stone-300/30 md:text-[17px] md:leading-relaxed';
 
-const readOnlyProse = 'text-[15px] leading-relaxed text-stone-900 whitespace-pre-wrap';
+const readOnlyProse =
+  'text-[16px] leading-[1.65] text-stone-900 whitespace-pre-wrap md:text-[17px] md:leading-[1.65]';
 
 export function ResumeHarvardPreview({
   data,
@@ -260,16 +261,16 @@ export function ResumeHarvardPreview({
         initial={{ opacity: 0.88, scale: 0.995 }}
         animate={{ opacity: 1, scale: 1 }}
         transition={{ duration: 0.35, ease: 'easeOut' }}
-        className="relative w-full overflow-hidden rounded-2xl border border-stone-200/90 bg-white shadow-[0_24px_80px_-24px_rgba(15,23,42,0.12)]"
+        className="relative w-full overflow-visible transition-all duration-300"
         style={{ fontFamily: 'Georgia, "Times New Roman", serif' }}
       >
         <div
-          className="absolute top-0 right-0 left-0 h-1"
+          className="absolute top-0 right-0 left-0 h-1 rounded-t-sm"
           style={{ backgroundColor: accent }}
           aria-hidden
         />
 
-        <div className="px-5 pt-8 pb-10 sm:px-8 sm:pt-10 sm:pb-12 lg:px-12 lg:pb-14">
+        <div className="pt-2 pb-4 sm:pt-3 sm:pb-6">
           <div className="mb-2 flex flex-wrap items-start justify-between gap-4">
             <div className="min-w-0 flex-1 space-y-3">
               <div className="flex flex-wrap items-center justify-between gap-2">
@@ -289,13 +290,15 @@ export function ResumeHarvardPreview({
               </div>
               {readOnly ? (
                 <>
-                  <h1 className="text-[22px] leading-tight font-normal tracking-wide text-stone-900 uppercase sm:text-[26px]">
+                  <h1 className="text-[26px] leading-tight font-normal tracking-wide text-stone-900 uppercase sm:text-[32px]">
                     {data.header.name}
                   </h1>
                   {data.header.title ? (
-                    <p className="text-[15px] leading-snug text-stone-800">{data.header.title}</p>
+                    <p className="text-[17px] leading-snug text-stone-800 sm:text-[18px]">
+                      {data.header.title}
+                    </p>
                   ) : null}
-                  <p className="font-sans text-[13px] text-stone-600">
+                  <p className="font-sans text-[14px] text-stone-600 sm:text-[15px]">
                     {[data.header.location, data.header.email].filter(Boolean).join(' · ')}
                   </p>
                 </>
@@ -352,7 +355,7 @@ export function ResumeHarvardPreview({
           {(data.summary.original.trim() || data.summary.improved.trim()) && (
             <section className="mt-8">
               <div className="mb-3 flex flex-wrap items-center justify-between gap-3 border-b border-stone-900 pb-2">
-                <h2 className="text-[11px] font-bold tracking-[0.2em] text-stone-900 uppercase">
+                <h2 className="text-[12px] font-bold tracking-[0.18em] text-stone-900 uppercase">
                   {t.summary}
                 </h2>
                 <div className="flex flex-wrap items-center gap-3">
@@ -414,7 +417,7 @@ export function ResumeHarvardPreview({
 
           {data.experience.length > 0 && (
             <section className="mt-8">
-              <h2 className="text-foreground mb-5 border-b border-stone-900 pb-2 text-[11px] font-bold tracking-[0.2em] uppercase">
+              <h2 className="text-foreground mb-5 border-b border-stone-900 pb-2 text-[12px] font-bold tracking-[0.18em] uppercase">
                 {t.experience}
               </h2>
               <div className="space-y-10">
@@ -437,8 +440,8 @@ export function ResumeHarvardPreview({
                     {readOnly ? (
                       <div className="flex flex-wrap items-baseline justify-between gap-2">
                         <div>
-                          <p className="text-[15px] font-bold text-stone-900">{exp.company}</p>
-                          <p className="mt-0.5 text-[14px] text-stone-800">{exp.title}</p>
+                          <p className="text-[17px] font-bold text-stone-900">{exp.company}</p>
+                          <p className="mt-0.5 text-[15px] text-stone-800 sm:text-[16px]">{exp.title}</p>
                           {exp.location ? (
                             <p className="mt-0.5 font-sans text-[12px] text-stone-600">
                               {exp.location}
@@ -591,7 +594,7 @@ export function ResumeHarvardPreview({
             data.skills.added.length > 0) && (
             <section className="mt-8">
               <div className="mb-4 flex flex-wrap items-center justify-between gap-2 border-b border-stone-900 pb-2">
-                <h2 className="text-[11px] font-bold tracking-[0.2em] text-stone-900 uppercase">
+                <h2 className="text-[12px] font-bold tracking-[0.18em] text-stone-900 uppercase">
                   {t.skills}
                 </h2>
                 {showRevert ? (
@@ -704,7 +707,7 @@ export function ResumeHarvardPreview({
           {data.education.length > 0 && (
             <section className="mt-8">
               <div className="mb-4 flex flex-wrap items-center justify-between gap-2 border-b border-stone-900 pb-2">
-                <h2 className="text-[11px] font-bold tracking-[0.2em] text-stone-900 uppercase">
+                <h2 className="text-[12px] font-bold tracking-[0.18em] text-stone-900 uppercase">
                   {t.education}
                 </h2>
                 {showRevert ? (
@@ -758,7 +761,7 @@ export function ResumeHarvardPreview({
 
           {data.languages.length > 0 && (
             <section className="mt-8">
-              <h2 className="text-foreground mb-3 border-b border-stone-900 pb-2 text-[11px] font-bold tracking-[0.2em] uppercase">
+              <h2 className="text-foreground mb-3 border-b border-stone-900 pb-2 text-[12px] font-bold tracking-[0.18em] uppercase">
                 {t.languages}
               </h2>
               {readOnly ? (

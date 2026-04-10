@@ -1,5 +1,5 @@
 import { motion } from 'motion/react';
-import { ArrowRight, Copy } from 'lucide-react';
+import { ArrowRight, Copy, Info } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface Suggestion {
@@ -13,10 +13,35 @@ interface SuggestionCardProps {
   language: 'en' | 'es';
 }
 
+const strings = {
+  en: {
+    intro:
+      'These are style examples, not final wording. Replace anything in brackets […] and adjust numbers to match your real results before using it in your CV.',
+    before: 'Before',
+    exampleLabel: 'Example rewrite',
+    copyAria: 'Copy example text',
+    copiedTitle: 'Copied',
+    copiedDescription:
+      'Review placeholders and sample figures — tailor the sentence to your experience.',
+  },
+  es: {
+    intro:
+      'Son ejemplos de estilo y estructura, no un texto para pegar tal cual. Sustituye lo que va entre corchetes […], revisa las cifras de muestra y adáptalo a tu experiencia real.',
+    before: 'Antes',
+    exampleLabel: 'Ejemplo de redacción',
+    copyAria: 'Copiar texto de ejemplo',
+    copiedTitle: 'Copiado',
+    copiedDescription:
+      'Revisa corchetes y cifras de ejemplo; ajusta la frase a tu trayectoria antes de usarla en el CV.',
+  },
+} as const;
+
 export function SuggestionCard({ suggestions, title, language }: SuggestionCardProps) {
+  const t = strings[language];
+
   const handleCopy = (text: string) => {
     navigator.clipboard.writeText(text);
-    toast.success(language === 'en' ? 'Copied to clipboard!' : '¡Copiado al portapapeles!');
+    toast.success(t.copiedTitle, { description: t.copiedDescription, duration: 4500 });
   };
 
   return (
@@ -26,7 +51,14 @@ export function SuggestionCard({ suggestions, title, language }: SuggestionCardP
       transition={{ duration: 0.6, delay: 0.4 }}
       className="border-border/80 bg-card/40 rounded-xl border px-5 py-6 shadow-none sm:px-6 sm:py-7"
     >
-      <h3 className="text-foreground mb-5 text-lg font-semibold md:text-xl">{title}</h3>
+      <h3 className="text-foreground mb-3 text-lg font-semibold md:text-xl">{title}</h3>
+      <p className="text-muted-foreground mb-6 flex gap-2.5 text-sm leading-relaxed">
+        <Info
+          className="text-primary mt-0.5 size-4 shrink-0 opacity-90"
+          aria-hidden
+        />
+        <span>{t.intro}</span>
+      </p>
 
       <div className="space-y-6">
         {suggestions.map((suggestion, index) => (
@@ -42,7 +74,7 @@ export function SuggestionCard({ suggestions, title, language }: SuggestionCardP
               <div className="flex items-start justify-between gap-4">
                 <div className="flex-1">
                   <p className="text-muted-foreground mb-2 text-xs font-semibold tracking-wide uppercase">
-                    {language === 'en' ? 'Before' : 'Antes'}
+                    {t.before}
                   </p>
                   <p className="text-foreground/85 text-sm leading-relaxed md:text-base">
                     {suggestion.original}
@@ -63,7 +95,7 @@ export function SuggestionCard({ suggestions, title, language }: SuggestionCardP
               <div className="flex items-start justify-between gap-4">
                 <div className="flex-1">
                   <p className="mb-2 text-xs font-semibold tracking-wide text-emerald-800 uppercase">
-                    {language === 'en' ? 'Suggestion' : 'Sugerencia'}
+                    {t.exampleLabel}
                   </p>
                   <p className="text-foreground text-sm leading-relaxed md:text-base">
                     {suggestion.improved}
@@ -74,7 +106,7 @@ export function SuggestionCard({ suggestions, title, language }: SuggestionCardP
                   whileTap={{ scale: 0.9 }}
                   onClick={() => handleCopy(suggestion.improved)}
                   className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg border border-green-300 bg-white transition-colors hover:bg-green-100"
-                  aria-label="Copy"
+                  aria-label={t.copyAria}
                 >
                   <Copy className="h-4 w-4 text-green-700" />
                 </motion.button>

@@ -145,7 +145,7 @@ export function analyzeResumeText(raw: string): AnalysisResult {
   if (weak) {
     suggestions.push({
       original: weak,
-      improved: `${weak.replace(/\.$/, '')}, logrando un incremento del 18% en [métrica clave] en 12 meses y coordinando un equipo de 5 personas.`,
+      improved: `${weak.replace(/\.$/, '')}, logrando un incremento del [X]% en [tu métrica real, p. ej. tráfico orgánico] en [periodo] y coordinando un equipo de [n] personas.`,
     });
   }
 

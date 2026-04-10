@@ -1,25 +1,31 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
+import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   Upload,
-  CheckCircle,
   FileText,
   Zap,
   TrendingUp,
   Download,
   Loader2,
   Trash2,
+  ChevronDown,
+  Sparkles,
 } from 'lucide-react';
 import { Toaster, toast } from 'sonner';
-import { Skeleton } from './components/ui/skeleton';
-import { UploadDropzone } from './components/UploadDropzone';
-import { ScoreCard } from './components/ScoreCard';
+import { PreviewLoadingOverlay } from './components/PreviewLoadingOverlay';
 import { IssuesList } from './components/IssuesList';
-import { SuggestionCard } from './components/SuggestionCard';
 import { HowItWorksStep } from './components/HowItWorksStep';
 import { ResumeHarvardPreview } from './components/ResumeHarvardPreview';
+import { HeroAIAnalysis } from './components/HeroAIAnalysis';
+import { ATSScoreCard } from './components/ATSScoreCard';
+import { AISuggestionsPanel } from './components/AISuggestionsPanel';
+import { ResumePreview } from './components/ResumePreview';
+import { Skeleton } from './components/ui/skeleton';
+import { deriveAtsInsights } from '@/src/lib/ats-score-insights';
 import type { AnalysisResult } from '@/src/lib/analysis-types';
 import { buildPlaintextFromStructured } from '@/src/lib/build-plaintext-from-structured';
 import type { CvApprovalMap, CvStructured } from '@/src/lib/cv-structured-types';
@@ -75,10 +81,25 @@ const translations = {
     scoreTitle: 'Puntuación de Compatibilidad ATS',
     issuesTitle: 'Problemas Encontrados',
     suggestionsTitle: 'Mejoras Sugeridas',
-    upgradeTitle: 'Mejora tu CV con IA',
-    upgradeDescription:
-      'Obtén recomendaciones personalizadas y optimización con IA para conseguir más entrevistas',
-    upgradeButton: 'Optimizar CV',
+    atsExplainTitle: 'Qué son los ATS y por qué importa optimizar tu CV',
+    atsExplainP1:
+      'Un ATS (Applicant Tracking System) es el software que usan muchas empresas para recibir, filtrar y ordenar currículos. Suele extraer el texto de tu CV, buscar coincidencias con la oferta y priorizar candidaturas según criterios automáticos.',
+    atsExplainP2:
+      'Por eso no se trata solo de diseño: importa que el documento se lea bien como texto, con secciones claras, fechas reconocibles y palabras alineadas con el puesto. Estructuras rígidas o ilegibles para el sistema pueden hacer que pierdas información en el proceso.',
+    atsExplainP3:
+      'Optimizar para ATS no garantiza el trabajo, pero reduce fricciones: tu información llega ordenada al reclutador y ganas opciones de pasar el primer filtro, sobre todo cuando hay muchas candidaturas.',
+    atsReadMore: 'Leer más',
+    atsExplainP4:
+      'En la práctica, el ATS suele «leer» tu CV como texto: convierte PDF o Word en cadenas de caracteres, identifica bloques (experiencia, formación, habilidades) y compara lo que encuentra con la ficha del puesto. Si el archivo tiene columnas complejas, tablas muy anidadas o texto incrustado en imágenes, partes importantes pueden quedar vacías o en el orden equivocado.',
+    atsExplainP5:
+      'Muchos sistemas asignan puntuaciones o etiquetas automáticas (por ejemplo, años de experiencia en una tecnología o cercanía léxica con la descripción del rol). No todos los ATS funcionan igual: unos son más estrictos con el parseo, otros permiten más revisión humana. Aun así, el primer filtro suele ser automático cuando el volumen de candidaturas es alto.',
+    atsExplainP6:
+      'Por eso conviene alinear el lenguaje de tu CV con el de la oferta sin caer en relleno artificial: usar títulos de puesto reconocibles, fechas coherentes, métricas cuando las tengas y sinónimos razonables de las competencias que pide la empresa. El objetivo es que tanto el software como la persona que revisa después entiendan rápido tu impacto.',
+    atsExplainP7:
+      'Un CV «amigable para ATS» no sustituye una buena trayectoria: solo evita que se pierda información técnica en el camino. Después del filtro automático, suele haber revisión humana; el documento debe seguir siendo honesto, legible y fácil de escanear en pantalla o en impreso.',
+    footerCopyright: '© 2026 ATS Resume Checker.',
+    footerNonProfit: 'Proyecto sin ánimo de lucro, creado por',
+    authorName: 'Rus Madrigal',
     howItWorksTitle: 'Cómo funciona',
     step1Title: 'Sube tu currículum',
     step1Desc: 'Arrastra tu archivo PDF o DOCX para iniciar el análisis',
@@ -86,19 +107,14 @@ const translations = {
     step2Desc: 'Nuestra IA revisa formato, palabras clave y estructura',
     step3Title: 'Obtén mejoras',
     step3Desc: 'Recibe sugerencias accionables para mejorar tu puntuación ATS',
-    footer: '© 2026 ATS Resume Checker. Creado con IA.',
     privacy: 'Privacidad',
-    terms: 'Términos',
-    exportBlockTitle: 'Último paso: descargar',
-    exportBlockHint:
-      'Word y PDF usan el mismo contenido que tu vista previa (incluidas las ediciones y lo que aprobaste). Si aún no hay vista previa, puedes usar la casilla de IA abajo.',
+    cookies: 'Cookies',
+    legalNotice: 'Aviso legal',
+    exportBlockTitle: 'Descargar',
     downloadDocx: 'Descargar Word',
     downloadPdf: 'Descargar PDF',
     exportLoading: 'Generando…',
     exportSuccess: 'Descarga lista',
-    useAiLabel: 'Reescribir con IA al exportar',
-    useAiHint:
-      'Usa OpenAI en el servidor (OPENAI_API_KEY). Si está desactivado, solo se aplican sustituciones heurísticas.',
     previewTitle: 'Vista previa de tu currículum',
     previewDescription:
       'Tras subir el archivo, la vista previa con IA se genera sola. Si vuelves a subir el mismo fichero, se recupera la guardada (sin gastar tokens). Puedes quitar la vista previa con el botón o al subir otro CV.',
@@ -120,6 +136,26 @@ const translations = {
     stepPreview: 'Vista previa',
     stepDownload: 'Descargar',
     resultsWelcome: 'Listo. Aquí tienes el resultado, en orden sencillo.',
+    heroAiBadge: 'Impulsado por IA',
+    heroAiTitle: 'Optimización de CV con IA',
+    heroAiSubtitle:
+      'Tu currículum analizado y preparado para sistemas ATS, con sugerencias claras y vista previa lista para reclutadores.',
+    insightsTitle: 'Puntuación ATS',
+    insightsReadability: 'Legibilidad',
+    insightsKeywords: 'Términos clave',
+    insightsFormatting: 'Formato',
+    insightsExperience: 'Experiencia',
+    aiSuggestionsTitle: 'Sugerencias inteligentes',
+    improvementApply: 'Copiar propuesta',
+    improvementApplied: 'Copiado al portapapeles',
+    applyAllImprovements: 'Aplicar todas',
+    livePreviewTitle: 'Vista previa del CV',
+    livePreviewSubtitle: 'Versión optimizada con mejoras de IA',
+    previewEmptyTitle: 'Genera la vista previa estructurada',
+    previewEmptyHint: 'La IA organizará tu CV en secciones claras. Luego podrás aprobar cada cambio.',
+    applyAllToast: 'Cambios de IA aplicados en la vista previa.',
+    beforeTab: 'Antes',
+    afterTab: 'Después',
   },
 } as const;
 
@@ -130,12 +166,13 @@ const language = 'es' as const;
 const MAX_FILE_BYTES = 10 * 1024 * 1024;
 
 export default function App() {
+  const pathname = usePathname();
+  const resultsAnchorRef = useRef<HTMLDivElement>(null);
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
   const [showResults, setShowResults] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analysis, setAnalysis] = useState<AnalysisResult | null>(null);
   const [exportingFormat, setExportingFormat] = useState<'docx' | 'pdf' | null>(null);
-  const [useExportAi, setUseExportAi] = useState(false);
   const [structuredPreview, setStructuredPreview] = useState<CvStructured | null>(null);
   const [structuredBaseline, setStructuredBaseline] = useState<CvStructured | null>(null);
   const [previewReadOnly, setPreviewReadOnly] = useState(false);
@@ -145,6 +182,11 @@ export default function App() {
   const [persistFileKey, setPersistFileKey] = useState<string | null>(null);
   const [persistFileName, setPersistFileName] = useState<string | null>(null);
   const sessionHydratedRef = useRef(false);
+  /** Incrementa tras un análisis OK por subida de archivo (no al hidratar sesión). */
+  const [resultsScrollToken, setResultsScrollToken] = useState(0);
+  /** Remonta el overlay de tips cada vez que arranca una nueva generación de vista previa. */
+  const [previewOverlayKey, setPreviewOverlayKey] = useState(0);
+  const [previewPulse, setPreviewPulse] = useState(false);
 
   // const [language, setLanguage] = useState<Language>('en');
   // const t = translations[language];
@@ -195,6 +237,14 @@ export default function App() {
     persistFileKey,
     persistFileName,
   ]);
+
+  useEffect(() => {
+    if (!showResults || !analysis || resultsScrollToken === 0) return;
+    const timer = window.setTimeout(() => {
+      resultsAnchorRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 100);
+    return () => window.clearTimeout(timer);
+  }, [showResults, analysis, resultsScrollToken]);
 
   const clearPreviewOnly = () => {
     clearPreviewSessionStorage();
@@ -254,6 +304,7 @@ export default function App() {
       }
       setAnalysis(result);
       setShowResults(true);
+      setResultsScrollToken((n) => n + 1);
       setPersistFileKey(nextKey);
       setPersistFileName(file.name);
       if (reusePreview && storedBefore) {
@@ -275,6 +326,7 @@ export default function App() {
 
   async function runStructuredPreview(file: File, replaceExisting: boolean) {
     setPreviewLoading(true);
+    setPreviewOverlayKey((k) => k + 1);
     try {
       const body = new FormData();
       body.append('file', file);
@@ -323,6 +375,19 @@ export default function App() {
   const handleClearPreview = () => {
     if (previewLoading) return;
     clearPreviewOnly();
+  };
+
+  const copySuggestionText = (text: string) => {
+    void navigator.clipboard.writeText(text);
+    toast.success(t.improvementApplied);
+  };
+
+  const handleApplyAllImprovements = () => {
+    if (!structuredPreview) return;
+    setApprovals(defaultApprovalsForCv(structuredPreview));
+    setPreviewPulse(true);
+    toast.success(t.applyAllToast);
+    window.setTimeout(() => setPreviewPulse(false), 1800);
   };
 
   const handleApprovalChange = (key: string, accepted: boolean) => {
@@ -417,12 +482,10 @@ export default function App() {
       const body = new FormData();
       body.append('file', uploadedFile);
       body.append('format', format);
-      if (structuredPreview && Object.keys(approvals).length > 0) {
+      if (structuredPreview) {
         body.append('improvedText', buildPlaintextFromStructured(structuredPreview, approvals));
-        body.append('useAi', 'false');
-      } else {
-        body.append('useAi', useExportAi ? 'true' : 'false');
       }
+      body.append('useAi', 'false');
       const res = await fetch('/api/export-improved', { method: 'POST', body });
       if (!res.ok) {
         const data: unknown = await res.json().catch(() => ({}));
@@ -452,8 +515,13 @@ export default function App() {
   };
 
   return (
-    <div className="bg-background min-h-screen">
-      <Toaster position="bottom-right" />
+    <div className="bg-background min-h-screen overflow-x-hidden">
+      <Toaster position="bottom-right" richColors />
+      <PreviewLoadingOverlay
+        key={previewOverlayKey}
+        open={previewLoading && !structuredPreview}
+        title={t.previewLoading}
+      />
 
       {/* Header */}
       <motion.header
@@ -462,18 +530,28 @@ export default function App() {
         transition={{ duration: 0.6 }}
         className="border-border/60 bg-background/85 sticky top-0 z-50 border-b backdrop-blur-md"
       >
-        <div className="mx-auto flex max-w-[min(100%,1920px)] items-center justify-start px-5 py-3.5 sm:px-8">
-          <div className="flex items-center gap-3">
-            <div className="bg-primary flex h-10 w-10 items-center justify-center rounded-2xl shadow-sm">
+        <div className="mx-auto flex max-w-[min(100%,1920px)] items-center justify-start px-4 py-3 sm:px-8 sm:py-3.5">
+          <Link
+            href="/"
+            scroll={false}
+            onClick={(e) => {
+              if (pathname === '/') {
+                e.preventDefault();
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+              }
+            }}
+            className="focus-visible:ring-primary flex items-center gap-3 rounded-2xl outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
+          >
+            <div className="bg-primary flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl shadow-sm">
               <FileText className="text-primary-foreground h-[22px] w-[22px]" />
             </div>
-            <div className="flex flex-col leading-tight">
-              <span className="text-foreground text-base font-semibold tracking-tight">
+            <div className="flex min-w-0 flex-col leading-tight">
+              <span className="text-foreground truncate text-base font-semibold tracking-tight">
                 {t.title}
               </span>
               <span className="text-muted-foreground hidden text-xs sm:inline">{t.tagline}</span>
             </div>
-          </div>
+          </Link>
           {/*
           <button
             onClick={toggleLanguage}
@@ -492,68 +570,21 @@ export default function App() {
       </motion.header>
 
       <main>
-        {/* Hero Section */}
-        <section className="relative overflow-hidden">
-          <div className="from-primary/[0.06] via-background to-accent/40 absolute inset-0 bg-gradient-to-b" />
-          <div className="relative mx-auto max-w-[min(100%,1200px)] px-5 pt-10 pb-14 sm:px-8 md:pt-16 md:pb-20">
-            <motion.div
-              initial={{ y: 30, opacity: 0 }}
-              animate={{ y: 0, opacity: 1 }}
-              transition={{ duration: 0.8, delay: 0.2 }}
-              className="mx-auto max-w-2xl text-center"
-            >
-              <motion.div
-                initial={{ scale: 0.9, opacity: 0 }}
-                animate={{ scale: 1, opacity: 1 }}
-                transition={{ duration: 0.6, delay: 0.3 }}
-                className="bg-primary/8 border-primary/15 text-primary mb-6 inline-flex items-center gap-2 rounded-full border px-4 py-2"
-              >
-                <Zap className="size-4 shrink-0" aria-hidden />
-                <span className="text-sm font-medium">{t.tagline}</span>
-              </motion.div>
+        <HeroAIAnalysis
+          badge={t.heroAiBadge}
+          title={t.heroAiTitle}
+          subtitle={t.heroAiSubtitle}
+          onFileSelect={handleFileSelect}
+          isAnalyzing={isAnalyzing}
+          language={language}
+          fileLabel={uploadedFile?.name ?? persistFileName ?? null}
+          sessionHint={
+            !uploadedFile && persistFileName
+              ? t.sessionRestoredBanner.replace('{name}', persistFileName)
+              : null
+          }
+        />
 
-              <h1 className="font-display text-foreground mb-5 text-[1.75rem] leading-[1.15] font-bold tracking-tight sm:text-4xl md:text-[2.75rem]">
-                {t.headline}
-              </h1>
-
-              <p className="text-muted-foreground mb-10 text-base leading-relaxed md:text-lg">
-                {t.subheadline}
-              </p>
-
-              <motion.div
-                initial={{ y: 20, opacity: 0 }}
-                animate={{ y: 0, opacity: 1 }}
-                transition={{ duration: 0.8, delay: 0.5 }}
-              >
-                <UploadDropzone
-                  onFileSelect={handleFileSelect}
-                  isAnalyzing={isAnalyzing}
-                  language={language}
-                />
-              </motion.div>
-
-              {(uploadedFile || persistFileName) && (
-                <motion.div
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  className="text-muted-foreground mt-6 flex flex-col items-center gap-1 text-sm"
-                >
-                  <p className="flex items-center justify-center gap-2">
-                    <CheckCircle className="h-4 w-4 text-green-600" aria-hidden />
-                    {uploadedFile?.name ?? persistFileName}
-                  </p>
-                  {!uploadedFile && persistFileName ? (
-                    <p className="text-amber-900 max-w-md text-center text-xs leading-relaxed">
-                      {t.sessionRestoredBanner.replace('{name}', persistFileName)}
-                    </p>
-                  ) : null}
-                </motion.div>
-              )}
-            </motion.div>
-          </div>
-        </section>
-
-        {/* Results Section */}
         <AnimatePresence>
           {showResults && analysis && (
             <motion.section
@@ -561,272 +592,290 @@ export default function App() {
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -40 }}
               transition={{ duration: 0.6 }}
-              className="bg-muted/25 w-full px-4 py-10 sm:px-6 md:py-12 lg:px-10 xl:px-12"
+              className="from-muted/15 w-full bg-gradient-to-b to-background px-3 py-8 sm:px-5 sm:py-10 md:py-12 lg:px-8"
               aria-live="polite"
             >
-              <div className="mx-auto mb-10 max-w-[1920px]">
-                <p className="text-foreground mb-4 text-lg font-semibold md:text-xl">
+              <div
+                ref={resultsAnchorRef}
+                className="scroll-mt-[4.5rem] sm:scroll-mt-[5rem]"
+                aria-hidden
+              />
+              <div className="mx-auto max-w-[min(100%,1440px)] space-y-6">
+                <p className="text-muted-foreground text-center text-sm font-medium tracking-wide">
                   {t.resultsWelcome}
                 </p>
-                <ol className="text-muted-foreground flex flex-wrap gap-3 font-sans text-sm font-medium md:gap-4">
-                  <li className="bg-background border-border/80 rounded-full border px-4 py-2">
-                    1 · {t.stepAnalysis}
-                  </li>
-                  <li className="bg-background border-border/80 rounded-full border px-4 py-2">
-                    2 · {t.stepSuggestions}
-                  </li>
-                  <li className="bg-background border-border/80 rounded-full border px-4 py-2">
-                    3 · {t.stepPreview}
-                  </li>
-                  <li className="bg-background border-border/80 rounded-full border px-4 py-2">
-                    4 · {t.stepDownload}
-                  </li>
-                </ol>
-              </div>
-              <div className="mx-auto flex max-w-[1920px] flex-col gap-10 xl:flex-row xl:items-start xl:gap-14">
-                <aside className="flex w-full shrink-0 flex-col gap-5 xl:sticky xl:top-24 xl:w-[300px]">
-                  <ScoreCard score={analysis.score} language={language} />
-                  {analysis.issues.length === 0 ? (
-                    <motion.div
-                      initial={{ opacity: 0, y: 12 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      className="border-border/80 bg-card/50 rounded-xl border px-5 py-4"
-                    >
-                      <h3 className="text-foreground mb-1 text-sm font-semibold">{t.issuesTitle}</h3>
-                      <p className="text-muted-foreground text-xs leading-relaxed">
-                        No se detectaron incidencias con las comprobaciones automáticas. Sigue
-                        afinando palabras clave según cada oferta.
-                      </p>
-                    </motion.div>
-                  ) : (
-                    <IssuesList issues={analysis.issues} title={t.issuesTitle} />
-                  )}
-                </aside>
 
-                <div className="min-w-0 flex-1 space-y-10">
-                  <SuggestionCard
-                    suggestions={analysis.suggestions}
-                    title={t.suggestionsTitle}
-                    language={language}
-                  />
+                <ATSScoreCard
+                  score={analysis.score}
+                  metrics={deriveAtsInsights(analysis.score, analysis.issues)}
+                  labels={{
+                    title: t.insightsTitle,
+                    readability: t.insightsReadability,
+                    keywords: t.insightsKeywords,
+                    formatting: t.insightsFormatting,
+                    experience: t.insightsExperience,
+                  }}
+                />
 
-                  <div className="space-y-6">
-                    <div>
-                      <h3 className="text-foreground text-xl font-semibold tracking-tight md:text-2xl">
-                        {t.previewTitle}
-                      </h3>
-                      <p className="text-muted-foreground mt-3 max-w-3xl text-base leading-relaxed">
-                        {t.previewDescription}
-                      </p>
-                      <p className="text-muted-foreground mt-2 max-w-3xl text-sm leading-relaxed">
-                        {t.previewHint}
-                      </p>
-                      <p className="text-muted-foreground mt-2 max-w-3xl text-xs leading-relaxed">
-                        {t.previewClearHint}
-                      </p>
-                      {!(previewLoading && !structuredPreview) ? (
-                        <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
-                          {!structuredPreview ? (
-                            <motion.button
-                              type="button"
-                              disabled={
-                                previewLoading || exportingFormat !== null || !uploadedFile
-                              }
-                              whileHover={{ scale: previewLoading ? 1 : 1.01 }}
-                              whileTap={{ scale: previewLoading ? 1 : 0.99 }}
-                              onClick={handleGenerateOrRegeneratePreview}
-                              className="bg-primary text-primary-foreground focus-visible:ring-primary inline-flex min-h-12 items-center justify-center gap-2 rounded-xl px-7 py-3.5 text-base font-semibold shadow-sm focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none disabled:opacity-60"
-                            >
-                              {previewLoading ? (
-                                <Loader2 className="h-5 w-5 animate-spin" aria-hidden />
-                              ) : (
-                                <FileText className="h-5 w-5" aria-hidden />
-                              )}
-                              {previewLoading ? t.previewLoading : t.previewButtonGenerate}
-                            </motion.button>
-                          ) : (
-                            <>
-                              <motion.button
-                                type="button"
-                                disabled={previewLoading || exportingFormat !== null || !uploadedFile}
-                                whileHover={{ scale: previewLoading ? 1 : 1.01 }}
-                                whileTap={{ scale: previewLoading ? 1 : 0.99 }}
-                                onClick={handleGenerateOrRegeneratePreview}
-                                className="border-border bg-background text-foreground hover:bg-muted focus-visible:ring-primary inline-flex min-h-12 items-center justify-center gap-2 rounded-xl border-2 px-7 py-3.5 text-base font-semibold focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none disabled:opacity-60"
-                              >
-                                {previewLoading ? (
-                                  <Loader2 className="h-5 w-5 animate-spin" aria-hidden />
-                                ) : (
-                                  <FileText className="h-5 w-5" aria-hidden />
-                                )}
-                                {previewLoading ? t.previewUpdating : t.previewButtonRegenerate}
-                              </motion.button>
-                              <motion.button
-                                type="button"
-                                disabled={previewLoading || exportingFormat !== null}
-                                whileHover={{ scale: previewLoading ? 1 : 1.01 }}
-                                whileTap={{ scale: previewLoading ? 1 : 0.99 }}
-                                onClick={handleClearPreview}
-                                className="text-foreground border-destructive/30 bg-background hover:bg-destructive/5 focus-visible:ring-destructive inline-flex min-h-12 items-center justify-center gap-2 rounded-xl border-2 px-7 py-3.5 text-base font-semibold focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none disabled:opacity-60"
-                              >
-                                <Trash2 className="h-5 w-5" aria-hidden />
-                                {t.previewClear}
-                              </motion.button>
-                            </>
-                          )}
-                        </div>
-                      ) : null}
-                    </div>
+                {analysis.issues.length === 0 ? (
+                  <motion.div
+                    initial={{ opacity: 0, y: 12 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="border-border/60 bg-card/40 rounded-xl border px-4 py-3"
+                  >
+                    <h3 className="text-foreground mb-1 text-xs font-semibold uppercase tracking-wide">
+                      {t.issuesTitle}
+                    </h3>
+                    <p className="text-muted-foreground text-xs leading-relaxed">
+                      Sin incidencias automáticas. Ajusta palabras clave según cada oferta.
+                    </p>
+                  </motion.div>
+                ) : (
+                  <IssuesList issues={analysis.issues} title={t.issuesTitle} />
+                )}
 
-                    {!uploadedFile && structuredPreview && persistFileName ? (
-                      <div
-                        role="status"
-                        className="border-amber-200/90 bg-amber-50/95 text-amber-950 rounded-xl border px-4 py-3 text-sm leading-relaxed"
-                      >
-                        {t.sessionRestoredBanner.replace('{name}', persistFileName)}
-                      </div>
-                    ) : null}
-
-                    {previewLoading && !structuredPreview ? (
-                      <div
-                        className="border-border/70 bg-card rounded-2xl border p-6 shadow-sm sm:p-8"
-                        aria-busy="true"
-                        aria-label={t.previewLoading}
-                      >
-                        <div className="mb-4 flex items-center gap-3">
-                          <Loader2 className="text-primary size-8 animate-spin shrink-0" aria-hidden />
-                          <p className="text-foreground text-base font-medium">{t.previewLoading}</p>
-                        </div>
-                        <div className="space-y-3">
-                          <Skeleton className="h-8 w-2/3 max-w-md" />
-                          <Skeleton className="h-4 w-full max-w-2xl" />
-                          <Skeleton className="h-4 w-full max-w-xl" />
-                          <Skeleton className="h-24 w-full max-w-2xl" />
-                          <Skeleton className="h-4 w-5/6 max-w-lg" />
-                        </div>
-                      </div>
-                    ) : null}
-
-                    {structuredPreview ? (
-                      <ResumeHarvardPreview
-                        data={structuredPreview}
-                        approvals={approvals}
-                        onApprovalChange={handleApprovalChange}
-                        onStructuredChange={handleStructuredChange}
-                        language={language}
-                        readOnly={previewReadOnly}
-                        onReadOnlyChange={setPreviewReadOnly}
-                        baseline={structuredBaseline}
-                        onRevertAll={revertAllFromAi}
-                        onRevertSummary={revertSummaryFromAi}
-                        onRevertHeader={revertHeaderFromAi}
-                        onRevertExperience={revertExperienceFromAi}
-                        onRevertBullet={revertBulletFromAi}
-                        onRevertSkills={revertSkillsFromAi}
-                        onRevertEducation={revertEducationFromAi}
-                      />
-                    ) : null}
+                <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-12">
+                  <div className="order-2 col-span-12 max-h-[calc(100vh-120px)] space-y-4 overflow-y-auto pr-1 lg:order-1 lg:col-span-5 [-ms-overflow-style:none] [scrollbar-width:thin] [&::-webkit-scrollbar]:w-1.5">
+                    <AISuggestionsPanel
+                      suggestions={analysis.suggestions}
+                      title={t.aiSuggestionsTitle}
+                      labels={{
+                        before: t.beforeTab,
+                        after: t.afterTab,
+                        apply: t.improvementApply,
+                        applied: t.improvementApplied,
+                      }}
+                      onApplyCopy={copySuggestionText}
+                    />
                   </div>
 
-                  <motion.div
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.6, delay: 0.15 }}
-                    className="border-border/70 bg-card rounded-2xl border px-5 py-7 shadow-sm sm:px-8 sm:py-9"
-                  >
-                    <h3 className="text-foreground mb-2 text-lg font-semibold md:text-xl">
-                      {t.exportBlockTitle}
-                    </h3>
-                    <p className="text-muted-foreground mb-8 text-base leading-relaxed">
-                      {t.exportBlockHint}
-                    </p>
-                    <div className="mb-6">
-                      <label className="flex cursor-pointer items-start gap-3">
-                        <input
-                          type="checkbox"
-                          checked={useExportAi}
-                          onChange={(e) => setUseExportAi(e.target.checked)}
-                          disabled={exportingFormat !== null}
-                          className="border-border text-primary focus-visible:ring-primary mt-0.5 size-5 shrink-0 rounded focus-visible:ring-2 focus-visible:ring-offset-2 disabled:opacity-60"
-                        />
-                        <span>
-                          <span className="text-foreground block text-sm font-medium">
-                            {t.useAiLabel}
-                          </span>
-                          <span className="text-muted-foreground mt-0.5 block text-xs leading-relaxed">
-                            {t.useAiHint}
-                          </span>
-                        </span>
-                      </label>
-                    </div>
-                    <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
-                      <motion.button
-                        type="button"
-                        disabled={exportingFormat !== null}
-                        whileHover={{ scale: exportingFormat ? 1 : 1.02 }}
-                        whileTap={{ scale: exportingFormat ? 1 : 0.98 }}
-                        onClick={() => downloadImproved('docx')}
-                        className="bg-primary text-primary-foreground focus-visible:ring-primary inline-flex min-h-12 items-center justify-center gap-2 rounded-xl px-8 text-base font-semibold shadow-sm transition-opacity focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none disabled:opacity-60"
+                  <div className="order-1 col-span-12 min-h-0 min-w-0 lg:order-2 lg:col-span-7">
+                    <div className="lg:sticky lg:top-6">
+                      <ResumePreview
+                        title={t.livePreviewTitle}
+                        subtitle={t.livePreviewSubtitle}
+                        highlightPulse={previewPulse}
+                        headerActions={
+                          <>
+                            {structuredPreview ? (
+                              <motion.button
+                                type="button"
+                                whileHover={{ scale: 1.02 }}
+                                whileTap={{ scale: 0.98 }}
+                                onClick={handleApplyAllImprovements}
+                                disabled={previewLoading}
+                                className="border-border/60 bg-background text-foreground hover:bg-muted/80 focus-visible:ring-primary inline-flex min-h-9 items-center gap-1.5 rounded-lg border px-3 text-xs font-semibold shadow-sm focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none disabled:opacity-50"
+                              >
+                                <Sparkles className="size-3.5" aria-hidden />
+                                {t.applyAllImprovements}
+                              </motion.button>
+                            ) : null}
+                            <motion.button
+                              type="button"
+                              disabled={exportingFormat !== null || !uploadedFile}
+                              whileHover={{ scale: exportingFormat || !uploadedFile ? 1 : 1.02 }}
+                              whileTap={{ scale: exportingFormat || !uploadedFile ? 1 : 0.98 }}
+                              onClick={() => downloadImproved('pdf')}
+                              className="bg-primary text-primary-foreground focus-visible:ring-primary inline-flex min-h-9 items-center gap-1.5 rounded-lg px-3.5 text-xs font-semibold shadow-sm focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none disabled:opacity-50"
+                            >
+                              {exportingFormat === 'pdf' ? (
+                                <Loader2 className="size-3.5 animate-spin" aria-hidden />
+                              ) : (
+                                <Download className="size-3.5" aria-hidden />
+                              )}
+                              PDF
+                            </motion.button>
+                            <motion.button
+                              type="button"
+                              disabled={exportingFormat !== null || !uploadedFile}
+                              whileHover={{ scale: exportingFormat || !uploadedFile ? 1 : 1.02 }}
+                              whileTap={{ scale: exportingFormat || !uploadedFile ? 1 : 0.98 }}
+                              onClick={() => downloadImproved('docx')}
+                              className="border-border bg-background hover:bg-muted focus-visible:ring-primary inline-flex min-h-9 items-center gap-1.5 rounded-lg border px-3.5 text-xs font-semibold focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none disabled:opacity-50"
+                            >
+                              {exportingFormat === 'docx' ? (
+                                <Loader2 className="size-3.5 animate-spin" aria-hidden />
+                              ) : (
+                                <Download className="size-3.5" aria-hidden />
+                              )}
+                              DOCX
+                            </motion.button>
+                          </>
+                        }
+                        meta={
+                          <>
+                            {!uploadedFile && structuredPreview && persistFileName ? (
+                              <div
+                                role="status"
+                                className="border-amber-200/90 bg-amber-50/95 text-amber-950 rounded-lg border px-3 py-2 text-xs leading-relaxed"
+                              >
+                                {t.sessionRestoredBanner.replace('{name}', persistFileName)}
+                              </div>
+                            ) : null}
+                            <p className="text-muted-foreground text-sm leading-relaxed">
+                              {t.previewDescription}
+                            </p>
+                            {!(previewLoading && !structuredPreview) ? (
+                              <div className="flex flex-wrap gap-2">
+                                {!structuredPreview ? (
+                                  <motion.button
+                                    type="button"
+                                    disabled={
+                                      previewLoading || exportingFormat !== null || !uploadedFile
+                                    }
+                                    whileHover={{ scale: previewLoading ? 1 : 1.01 }}
+                                    whileTap={{ scale: previewLoading ? 1 : 0.99 }}
+                                    onClick={handleGenerateOrRegeneratePreview}
+                                    className="bg-primary text-primary-foreground focus-visible:ring-primary inline-flex min-h-9 items-center gap-2 rounded-lg px-4 text-xs font-semibold shadow-sm focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none disabled:opacity-60"
+                                  >
+                                    {previewLoading ? (
+                                      <Loader2 className="size-4 animate-spin" aria-hidden />
+                                    ) : (
+                                      <FileText className="size-4" aria-hidden />
+                                    )}
+                                    {previewLoading ? t.previewLoading : t.previewButtonGenerate}
+                                  </motion.button>
+                                ) : (
+                                  <>
+                                    <motion.button
+                                      type="button"
+                                      disabled={
+                                        previewLoading || exportingFormat !== null || !uploadedFile
+                                      }
+                                      whileHover={{ scale: previewLoading ? 1 : 1.01 }}
+                                      whileTap={{ scale: previewLoading ? 1 : 0.99 }}
+                                      onClick={handleGenerateOrRegeneratePreview}
+                                      className="border-border bg-background text-foreground hover:bg-muted focus-visible:ring-primary inline-flex min-h-9 items-center gap-2 rounded-lg border px-4 text-xs font-semibold focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none disabled:opacity-60"
+                                    >
+                                      {previewLoading ? (
+                                        <Loader2 className="size-4 animate-spin" aria-hidden />
+                                      ) : (
+                                        <FileText className="size-4" aria-hidden />
+                                      )}
+                                      {previewLoading ? t.previewUpdating : t.previewButtonRegenerate}
+                                    </motion.button>
+                                    <motion.button
+                                      type="button"
+                                      disabled={previewLoading || exportingFormat !== null}
+                                      whileHover={{ scale: previewLoading ? 1 : 1.01 }}
+                                      whileTap={{ scale: previewLoading ? 1 : 0.99 }}
+                                      onClick={handleClearPreview}
+                                      className="text-foreground border-destructive/30 bg-background hover:bg-destructive/5 focus-visible:ring-destructive inline-flex min-h-9 items-center gap-2 rounded-lg border px-4 text-xs font-semibold focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none disabled:opacity-60"
+                                    >
+                                      <Trash2 className="size-4" aria-hidden />
+                                      {t.previewClear}
+                                    </motion.button>
+                                  </>
+                                )}
+                              </div>
+                            ) : null}
+                          </>
+                        }
                       >
-                        {exportingFormat === 'docx' ? (
-                          <Loader2 className="h-5 w-5 animate-spin" aria-hidden />
-                        ) : (
-                          <Download className="h-5 w-5" aria-hidden />
-                        )}
-                        {exportingFormat === 'docx' ? t.exportLoading : t.downloadDocx}
-                      </motion.button>
-                      <motion.button
-                        type="button"
-                        disabled={exportingFormat !== null}
-                        whileHover={{ scale: exportingFormat ? 1 : 1.02 }}
-                        whileTap={{ scale: exportingFormat ? 1 : 0.98 }}
-                        onClick={() => downloadImproved('pdf')}
-                        className="border-border bg-background hover:bg-muted focus-visible:ring-primary inline-flex min-h-12 items-center justify-center gap-2 rounded-xl border-2 px-8 text-base font-semibold transition-colors focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none disabled:opacity-60"
-                      >
-                        {exportingFormat === 'pdf' ? (
-                          <Loader2 className="h-5 w-5 animate-spin" aria-hidden />
-                        ) : (
-                          <Download className="h-5 w-5" aria-hidden />
-                        )}
-                        {exportingFormat === 'pdf' ? t.exportLoading : t.downloadPdf}
-                      </motion.button>
+                        {previewLoading && !structuredPreview ? (
+                          <div className="space-y-4 py-4" aria-busy="true">
+                            <Skeleton className="h-10 w-2/3 max-w-md" />
+                            <Skeleton className="h-4 w-full" />
+                            <Skeleton className="h-4 w-5/6" />
+                            <Skeleton className="h-40 w-full max-w-xl" />
+                            <Skeleton className="h-4 w-4/5" />
+                          </div>
+                        ) : null}
+
+                        {!structuredPreview && !previewLoading ? (
+                          <div className="flex min-h-[50vh] flex-col items-center justify-center border border-dashed border-stone-200 bg-stone-50/50 px-6 py-16 text-center">
+                            <p className="text-foreground text-base font-semibold">
+                              {t.previewEmptyTitle}
+                            </p>
+                            <p className="text-muted-foreground mx-auto mt-3 max-w-md text-sm leading-relaxed">
+                              {t.previewEmptyHint}
+                            </p>
+                          </div>
+                        ) : null}
+
+                        {structuredPreview ? (
+                          <motion.div
+                            key={`${previewPulse ? 'p' : 'n'}-${structuredPreview.header.name ?? 'cv'}`}
+                            className="transition-all duration-300"
+                            initial={{ opacity: 0.94 }}
+                            animate={{ opacity: 1 }}
+                            transition={{ duration: 0.35 }}
+                          >
+                            <ResumeHarvardPreview
+                              data={structuredPreview}
+                              approvals={approvals}
+                              onApprovalChange={handleApprovalChange}
+                              onStructuredChange={handleStructuredChange}
+                              language={language}
+                              readOnly={previewReadOnly}
+                              onReadOnlyChange={setPreviewReadOnly}
+                              baseline={structuredBaseline}
+                              onRevertAll={revertAllFromAi}
+                              onRevertSummary={revertSummaryFromAi}
+                              onRevertHeader={revertHeaderFromAi}
+                              onRevertExperience={revertExperienceFromAi}
+                              onRevertBullet={revertBulletFromAi}
+                              onRevertSkills={revertSkillsFromAi}
+                              onRevertEducation={revertEducationFromAi}
+                            />
+                          </motion.div>
+                        ) : null}
+                      </ResumePreview>
                     </div>
-                  </motion.div>
+                  </div>
                 </div>
               </div>
             </motion.section>
           )}
         </AnimatePresence>
 
-        {/* CTA Upgrade Section */}
+        {/* ATS explainer — teaser visible; texto ampliado en <details> para indexación */}
         <motion.section
           initial={{ opacity: 0 }}
           whileInView={{ opacity: 1 }}
           viewport={{ once: true }}
           transition={{ duration: 0.8 }}
-          className="mx-auto max-w-[min(100%,1200px)] px-5 py-10 sm:px-8 md:py-14"
+          className="mx-auto max-w-[min(100%,1200px)] px-5 py-10 pb-24 sm:px-8 sm:pb-28 md:py-14 md:pb-32"
+          aria-labelledby="ats-explainer-heading"
         >
-          <div className="border-border/60 bg-card rounded-2xl border px-6 py-10 text-center md:px-10 md:py-12">
+          <div className="border-border/60 from-primary/[0.05] relative overflow-hidden rounded-2xl border bg-gradient-to-b to-card px-5 py-10 sm:px-8 md:py-14">
+            <div
+              className="bg-primary/[0.07] pointer-events-none absolute -right-24 -top-24 size-72 rounded-full blur-3xl"
+              aria-hidden
+            />
             <motion.div
               initial={{ y: 20, opacity: 0 }}
               whileInView={{ y: 0, opacity: 1 }}
               viewport={{ once: true }}
-              transition={{ duration: 0.6, delay: 0.2 }}
+              transition={{ duration: 0.6, delay: 0.1 }}
+              className="relative mx-auto max-w-3xl text-left"
             >
-              <h2 className="font-display text-foreground mb-3 text-2xl font-bold tracking-tight md:text-3xl">
-                {t.upgradeTitle}
-              </h2>
-              <p className="text-muted-foreground mx-auto mb-6 max-w-xl text-base leading-relaxed">
-                {t.upgradeDescription}
-              </p>
-              <motion.button
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
-                className="bg-primary text-primary-foreground focus-visible:ring-primary inline-flex min-h-12 items-center gap-2 rounded-xl px-7 text-base font-semibold shadow-sm focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none"
+              <h2
+                id="ats-explainer-heading"
+                className="font-display text-foreground mb-6 text-center text-2xl font-bold tracking-tight md:mb-8 md:text-3xl"
               >
-                <TrendingUp className="h-5 w-5" aria-hidden />
-                {t.upgradeButton}
-              </motion.button>
+                {t.atsExplainTitle}
+              </h2>
+              <div className="text-muted-foreground space-y-4 text-base leading-relaxed md:text-[1.05rem]">
+                <p>{t.atsExplainP1}</p>
+                <p>{t.atsExplainP2}</p>
+                <p>{t.atsExplainP3}</p>
+              </div>
+              <details className="group border-border/50 text-muted-foreground mx-auto mt-8 max-w-3xl rounded-xl border bg-background/40 px-4 py-3 text-left sm:px-5 sm:py-4">
+                <summary className="text-primary hover:text-primary/90 [&::-webkit-details-marker]:hidden flex cursor-pointer list-none items-center justify-start gap-1.5 text-sm font-semibold transition-colors">
+                  {t.atsReadMore}
+                  <ChevronDown
+                    className="size-4 shrink-0 opacity-70 transition-transform duration-200 group-open:rotate-180"
+                    aria-hidden
+                  />
+                </summary>
+                <div className="mt-5 space-y-4 border-t border-border/40 pt-5 text-base leading-relaxed md:text-[1.05rem]">
+                  <p>{t.atsExplainP4}</p>
+                  <p>{t.atsExplainP5}</p>
+                  <p>{t.atsExplainP6}</p>
+                  <p>{t.atsExplainP7}</p>
+                </div>
+              </details>
             </motion.div>
           </div>
         </motion.section>
@@ -871,33 +920,47 @@ export default function App() {
       </main>
 
       {/* Footer */}
-      <footer className="border-border mt-24 border-t">
-        <div className="mx-auto max-w-[min(100%,1200px)] px-5 py-12 sm:px-8">
-          <div className="flex flex-col items-center justify-between gap-6 md:flex-row">
-            <p className="text-muted-foreground text-sm">{t.footer}</p>
-            <div className="flex items-center gap-8">
-              {/*
-              <button
-                onClick={toggleLanguage}
-                className="text-muted-foreground hover:text-foreground focus-visible:ring-primary flex items-center gap-2 text-sm transition-colors focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none"
-              >
-                <Globe className="h-4 w-4" />
-                {language === 'en' ? 'Español' : 'English'}
-              </button>
-              */}
-              <a
-                href="#"
+      <footer className="border-border mt-16 border-t sm:mt-24">
+        <div className="mx-auto max-w-[min(100%,1200px)] px-4 py-10 sm:px-8 sm:py-12">
+          <div className="flex flex-col items-center justify-center gap-6 md:flex-row md:justify-between">
+            <div className="text-muted-foreground flex max-w-xl flex-col gap-1.5 text-center text-sm md:text-left">
+              <p>{t.footerCopyright}</p>
+              <p>
+                {t.footerNonProfit}{' '}
+                <Link
+                  href="https://www.rusmadrigal.com/es"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-primary font-medium underline decoration-primary/40 underline-offset-2 transition-colors hover:decoration-primary"
+                >
+                  {t.authorName}
+                </Link>
+                .
+              </p>
+            </div>
+            <nav
+              aria-label="Legal"
+              className="flex flex-wrap items-center justify-center gap-x-6 gap-y-2"
+            >
+              <Link
+                href="/privacidad"
                 className="text-muted-foreground hover:text-foreground text-sm transition-colors"
               >
                 {t.privacy}
-              </a>
-              <a
-                href="#"
+              </Link>
+              <Link
+                href="/cookies"
                 className="text-muted-foreground hover:text-foreground text-sm transition-colors"
               >
-                {t.terms}
-              </a>
-            </div>
+                {t.cookies}
+              </Link>
+              <Link
+                href="/aviso-legal"
+                className="text-muted-foreground hover:text-foreground text-sm transition-colors"
+              >
+                {t.legalNotice}
+              </Link>
+            </nav>
           </div>
         </div>
       </footer>
