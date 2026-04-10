@@ -7,7 +7,9 @@ const improvedSchema = z.object({
   improvedText: z
     .string()
     .min(40)
-    .describe('Currículum completo en texto plano, español, con saltos de línea entre bloques.'),
+    .describe(
+      'Currículum completo en texto plano, en el MISMO idioma que el CV de entrada (sin traducir), con saltos de línea entre bloques.',
+    ),
 });
 
 export class AiImprovementError extends Error {
@@ -40,7 +42,8 @@ export async function improveCvTextWithAi(input: {
     model: openai(modelId),
     schema: improvedSchema,
     system: `Eres un redactor experto en currículums compatibles con sistemas ATS (Applicant Tracking Systems).
-Devuelves solo el campo improvedText: el CV entero en texto plano, en español, listo para pegar en Word.
+Devuelves solo improvedText: el CV entero en texto plano, listo para pegar en Word.
+IDIOMA (obligatorio): el resultado debe estar en el mismo idioma que el CV de entrada. Si el CV está en inglés, escribe en inglés; si está en español, en español; si es mixto, mantén cada bloque en el idioma en que esté redactado el original, sin traducir de un idioma a otro.
 Mantén un orden lógico: contacto, resumen o perfil (si encaja), experiencia, educación, habilidades.
 Usa viñetas con guiones donde ayude. Incluye cifras y verbos de acción cuando sea razonable.
 No inventes empleos ni titulaciones que no puedan inferirse del texto de entrada; puedes reformular y clarificar.`,

@@ -34,9 +34,9 @@ export function ScoreCard({ score, language }: ScoreCardProps) {
       initial={{ opacity: 0, scale: 0.9 }}
       animate={{ opacity: 1, scale: 1 }}
       transition={{ duration: 0.6, delay: 0.2 }}
-      className="bg-card border-border rounded-2xl border p-8 shadow-sm"
+      className="border-border/70 bg-card rounded-2xl border p-6 shadow-sm md:p-7"
     >
-      <h3 className="text-foreground mb-8 text-lg font-semibold md:text-xl">{t.score}</h3>
+      <h3 className="text-foreground mb-6 text-base font-semibold md:text-lg">{t.score}</h3>
 
       <div className="flex flex-col items-center gap-6">
         {/* Circular Progress */}

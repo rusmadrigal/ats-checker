@@ -17,9 +17,9 @@ export function IssuesList({ issues, title }: IssuesListProps) {
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.6, delay: 0.3 }}
-      className="bg-card border-border rounded-2xl border p-8 shadow-sm"
+      className="border-border/80 bg-card/50 rounded-xl border px-5 py-5 shadow-none"
     >
-      <h3 className="text-foreground mb-6 text-lg font-semibold md:text-xl">{title}</h3>
+      <h3 className="text-foreground mb-4 text-sm font-semibold">{title}</h3>
 
       <div className="space-y-4">
         {issues.map((issue, index) => (

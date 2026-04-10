@@ -18,23 +18,21 @@ export function HowItWorksStep({ icon, step, title, description, delay }: HowItW
       transition={{ duration: 0.6, delay }}
       className="text-center"
     >
-      <motion.div
-        whileHover={{ scale: 1.1, rotate: 5 }}
-        transition={{ duration: 0.3 }}
-        className="bg-primary/10 text-primary mb-6 inline-flex h-16 w-16 items-center justify-center rounded-2xl"
-      >
+      <div className="bg-primary/8 text-primary mb-5 inline-flex h-14 w-14 items-center justify-center rounded-2xl md:h-16 md:w-16">
         {icon}
-      </motion.div>
+      </div>
 
       <div className="mb-3">
-        <span className="bg-accent text-primary mb-4 inline-block rounded-full px-3 py-1 text-sm font-semibold">
+        <span className="bg-secondary text-foreground mb-3 inline-block rounded-full px-3 py-1.5 text-xs font-bold tracking-wide">
           {step}
         </span>
       </div>
 
       <h3 className="text-foreground mb-3 text-lg font-semibold md:text-xl">{title}</h3>
 
-      <p className="text-muted-foreground text-sm leading-relaxed md:text-base">{description}</p>
+      <p className="text-muted-foreground mx-auto max-w-xs text-sm leading-relaxed md:text-base">
+        {description}
+      </p>
     </motion.div>
   );
 }

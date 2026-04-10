@@ -24,9 +24,9 @@ export function SuggestionCard({ suggestions, title, language }: SuggestionCardP
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.6, delay: 0.4 }}
-      className="bg-card border-border rounded-2xl border p-8 shadow-sm"
+      className="border-border/80 bg-card/40 rounded-xl border px-5 py-6 shadow-none sm:px-6 sm:py-7"
     >
-      <h3 className="text-foreground mb-6 text-lg font-semibold md:text-xl">{title}</h3>
+      <h3 className="text-foreground mb-5 text-lg font-semibold md:text-xl">{title}</h3>
 
       <div className="space-y-6">
         {suggestions.map((suggestion, index) => (
@@ -38,13 +38,13 @@ export function SuggestionCard({ suggestions, title, language }: SuggestionCardP
             className="space-y-4"
           >
             {/* Original */}
-            <div className="rounded-xl border border-red-200 bg-red-50 p-4">
+            <div className="rounded-xl border border-stone-200 bg-stone-50/80 p-4 md:p-5">
               <div className="flex items-start justify-between gap-4">
                 <div className="flex-1">
-                  <p className="mb-2 text-xs font-medium tracking-wide text-red-600 uppercase">
-                    {language === 'en' ? 'Original' : 'Original'}
+                  <p className="text-muted-foreground mb-2 text-xs font-semibold tracking-wide uppercase">
+                    {language === 'en' ? 'Before' : 'Antes'}
                   </p>
-                  <p className="text-foreground/70 text-sm leading-relaxed md:text-base">
+                  <p className="text-foreground/85 text-sm leading-relaxed md:text-base">
                     {suggestion.original}
                   </p>
                 </div>
@@ -53,17 +53,17 @@ export function SuggestionCard({ suggestions, title, language }: SuggestionCardP
 
             {/* Arrow */}
             <div className="flex justify-center">
-              <div className="bg-primary/10 flex h-8 w-8 items-center justify-center rounded-full">
-                <ArrowRight className="text-primary h-4 w-4" />
+              <div className="bg-primary/8 flex h-9 w-9 items-center justify-center rounded-full">
+                <ArrowRight className="text-primary size-4" aria-hidden />
               </div>
             </div>
 
             {/* Improved */}
-            <div className="rounded-xl border border-green-200 bg-green-50 p-4">
+            <div className="rounded-xl border border-emerald-200/80 bg-emerald-50/50 p-4 md:p-5">
               <div className="flex items-start justify-between gap-4">
                 <div className="flex-1">
-                  <p className="mb-2 text-xs font-medium tracking-wide text-green-600 uppercase">
-                    {language === 'en' ? 'Improved' : 'Mejorado'}
+                  <p className="mb-2 text-xs font-semibold tracking-wide text-emerald-800 uppercase">
+                    {language === 'en' ? 'Suggestion' : 'Sugerencia'}
                   </p>
                   <p className="text-foreground text-sm leading-relaxed md:text-base">
                     {suggestion.improved}

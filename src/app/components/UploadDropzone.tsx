@@ -50,18 +50,18 @@ export function UploadDropzone({ onFileSelect, isAnalyzing, language }: UploadDr
 
   const text = {
     en: {
-      dropHere: 'Drop your resume here',
+      dropHere: 'Drop your file here',
       or: 'or',
-      browse: 'Browse files',
-      formats: 'PDF or DOCX up to 10MB',
-      uploading: 'Analyzing...',
+      browse: 'Choose file',
+      formats: 'PDF or Word (.docx), max. 10 MB',
+      uploading: 'Working on it…',
     },
     es: {
-      dropHere: 'Arrastra tu CV aquí',
-      or: 'o',
-      browse: 'Examinar archivos',
-      formats: 'PDF o DOCX hasta 10MB',
-      uploading: 'Analizando...',
+      dropHere: 'Suelta tu archivo aquí',
+      or: 'o si prefieres',
+      browse: 'Elegir archivo',
+      formats: 'PDF o Word (.docx), máximo 10 MB',
+      uploading: 'Trabajando en ello…',
     },
   };
 
@@ -72,62 +72,56 @@ export function UploadDropzone({ onFileSelect, isAnalyzing, language }: UploadDr
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
-      whileHover={{ scale: 1.02 }}
-      transition={{ duration: 0.2 }}
-      className={`relative rounded-2xl border-2 border-dashed p-8 transition-all md:p-12 ${
+      className={`relative min-h-[220px] rounded-2xl border-2 border-dashed transition-colors md:min-h-[260px] ${
         isDragging
-          ? 'border-primary bg-accent/50 scale-105'
-          : 'border-border bg-card hover:border-primary/50 hover:bg-accent/20'
+          ? 'border-primary bg-accent/50'
+          : 'border-border bg-card hover:border-primary/35 hover:bg-muted/30'
       }`}
     >
-      <div className="flex flex-col items-center justify-center gap-6">
+      <div className="flex h-full min-h-[220px] flex-col items-center justify-center gap-6 px-5 py-10 md:min-h-[260px] md:px-10 md:py-12">
         {isAnalyzing ? (
           <motion.div
-            initial={{ opacity: 0, scale: 0.8 }}
+            initial={{ opacity: 0, scale: 0.96 }}
             animate={{ opacity: 1, scale: 1 }}
-            className="flex flex-col items-center gap-4"
+            className="flex flex-col items-center gap-5"
           >
-            <Loader2 className="text-primary h-12 w-12 animate-spin" />
-            <p className="text-foreground font-medium">{t.uploading}</p>
+            <Loader2 className="text-primary size-14 animate-spin" aria-hidden />
+            <p className="text-foreground text-center text-lg font-medium">{t.uploading}</p>
           </motion.div>
         ) : (
           <>
-            <motion.div
-              animate={{ y: isDragging ? -8 : 0 }}
-              transition={{ duration: 0.2 }}
-              className="bg-primary/10 flex h-16 w-16 items-center justify-center rounded-2xl"
+            <div
+              className={`flex h-[72px] w-[72px] items-center justify-center rounded-2xl transition-colors ${
+                isDragging ? 'bg-primary/15' : 'bg-primary/10'
+              }`}
             >
               {isDragging ? (
-                <FileText className="text-primary h-8 w-8" />
+                <FileText className="text-primary size-9" aria-hidden />
               ) : (
-                <Upload className="text-primary h-8 w-8" />
+                <Upload className="text-primary size-9" aria-hidden />
               )}
-            </motion.div>
+            </div>
 
-            <div className="text-center">
-              <p className="text-foreground mb-2 text-base font-semibold md:text-lg">
-                {t.dropHere}
-              </p>
-              <p className="text-muted-foreground mb-4 text-xs md:text-sm">{t.or}</p>
+            <div className="max-w-md text-center">
+              <p className="text-foreground mb-2 text-lg font-semibold md:text-xl">{t.dropHere}</p>
+              <p className="text-muted-foreground mb-6 text-sm md:text-base">{t.or}</p>
 
-              <label htmlFor="file-upload">
-                <motion.span
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                  className="bg-primary text-primary-foreground shadow-primary/20 hover:shadow-primary/30 inline-block cursor-pointer rounded-xl px-6 py-3 font-semibold shadow-lg transition-all hover:shadow-xl"
-                >
+              <label htmlFor="file-upload" className="inline-block">
+                <span className="bg-primary text-primary-foreground focus-within:ring-primary inline-flex min-h-12 cursor-pointer items-center justify-center rounded-xl px-8 text-base font-semibold shadow-sm focus-within:ring-2 focus-within:ring-offset-2">
                   {t.browse}
-                </motion.span>
+                </span>
                 <input
                   id="file-upload"
                   type="file"
                   accept=".pdf,.docx"
                   onChange={handleFileInput}
-                  className="hidden"
+                  className="sr-only"
                 />
               </label>
 
-              <p className="text-muted-foreground mt-4 text-sm">{t.formats}</p>
+              <p className="text-muted-foreground mt-6 text-sm leading-relaxed md:text-base">
+                {t.formats}
+              </p>
             </div>
           </>
         )}
