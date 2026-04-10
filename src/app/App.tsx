@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Upload, CheckCircle, FileText, Zap, TrendingUp } from 'lucide-react';
+import { Upload, CheckCircle, FileText, Zap, TrendingUp, Download, Loader2 } from 'lucide-react';
 import { Toaster, toast } from 'sonner';
 import { UploadDropzone } from './components/UploadDropzone';
 import { ScoreCard } from './components/ScoreCard';
@@ -68,6 +68,20 @@ const translations = {
     footer: '© 2026 ATS Resume Checker. Creado con IA.',
     privacy: 'Privacidad',
     terms: 'Términos',
+    exportBlockTitle: 'Descargar versión mejorada',
+    exportBlockHint:
+      'El DOCX usa una plantilla fija con tu texto mejorado (docxtemplater). Si el servidor tiene Gotenberg o LibreOffice, el PDF se genera a partir de ese DOCX y conserva la maquetación de la plantilla; si no, se usa un PDF de texto plano como respaldo.',
+    downloadDocx: 'DOCX con plantilla',
+    downloadPdf: 'PDF (vía DOCX si hay conversor)',
+    exportLoading: 'Generando…',
+    exportSuccess: 'Descarga lista',
+    sectorLabel: 'Plantilla por sector',
+    sectorGeneral: 'General',
+    sectorTech: 'Tecnología',
+    sectorHealth: 'Salud',
+    useAiLabel: 'Reescribir con IA al exportar',
+    useAiHint:
+      'Usa OpenAI en el servidor (OPENAI_API_KEY). Si está desactivado, solo se aplican sustituciones heurísticas.',
   },
 } as const;
 
@@ -82,6 +96,9 @@ export default function App() {
   const [showResults, setShowResults] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analysis, setAnalysis] = useState<AnalysisResult | null>(null);
+  const [exportingFormat, setExportingFormat] = useState<'docx' | 'pdf' | null>(null);
+  const [exportSector, setExportSector] = useState<'default' | 'tech' | 'health'>('default');
+  const [useExportAi, setUseExportAi] = useState(false);
 
   // const [language, setLanguage] = useState<Language>('en');
   // const t = translations[language];
@@ -125,6 +142,46 @@ export default function App() {
       toast.error(message);
     } finally {
       setIsAnalyzing(false);
+    }
+  };
+
+  const downloadImproved = async (format: 'docx' | 'pdf') => {
+    if (!uploadedFile) {
+      toast.error('Primero sube un CV.');
+      return;
+    }
+    setExportingFormat(format);
+    try {
+      const body = new FormData();
+      body.append('file', uploadedFile);
+      body.append('format', format);
+      body.append('sector', exportSector);
+      body.append('useAi', useExportAi ? 'true' : 'false');
+      const res = await fetch('/api/export-improved', { method: 'POST', body });
+      if (!res.ok) {
+        const data: unknown = await res.json().catch(() => ({}));
+        const msg =
+          typeof data === 'object' && data !== null && 'error' in data
+            ? String((data as { error: unknown }).error)
+            : 'No se pudo generar el archivo.';
+        throw new Error(msg);
+      }
+      const blob = await res.blob();
+      const dispo = res.headers.get('Content-Disposition');
+      let filename = format === 'pdf' ? 'cv_mejorado.pdf' : 'cv_mejorado.docx';
+      const m = dispo?.match(/filename="([^"]+)"/);
+      if (m?.[1]) filename = m[1];
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      a.click();
+      URL.revokeObjectURL(url);
+      toast.success(t.exportSuccess);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Error al exportar.');
+    } finally {
+      setExportingFormat(null);
     }
   };
 
@@ -259,6 +316,92 @@ export default function App() {
                     title={t.suggestionsTitle}
                     language={language}
                   />
+
+                  <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.6, delay: 0.15 }}
+                    className="bg-card border-border rounded-2xl border p-8 shadow-sm"
+                  >
+                    <h3 className="text-foreground mb-3 text-lg font-semibold md:text-xl">
+                      {t.exportBlockTitle}
+                    </h3>
+                    <p className="text-muted-foreground mb-6 text-sm leading-relaxed md:text-base">
+                      {t.exportBlockHint}
+                    </p>
+                    <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-end">
+                      <div className="flex-1">
+                        <label
+                          htmlFor="export-sector"
+                          className="text-foreground mb-2 block text-sm font-medium"
+                        >
+                          {t.sectorLabel}
+                        </label>
+                        <select
+                          id="export-sector"
+                          value={exportSector}
+                          onChange={(e) =>
+                            setExportSector(e.target.value as 'default' | 'tech' | 'health')
+                          }
+                          disabled={exportingFormat !== null}
+                          className="border-border bg-background text-foreground focus-visible:ring-primary w-full rounded-xl border px-4 py-2.5 text-sm focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none disabled:opacity-60"
+                        >
+                          <option value="default">{t.sectorGeneral}</option>
+                          <option value="tech">{t.sectorTech}</option>
+                          <option value="health">{t.sectorHealth}</option>
+                        </select>
+                      </div>
+                      <label className="flex cursor-pointer items-start gap-3 sm:pb-2">
+                        <input
+                          type="checkbox"
+                          checked={useExportAi}
+                          onChange={(e) => setUseExportAi(e.target.checked)}
+                          disabled={exportingFormat !== null}
+                          className="border-border text-primary focus-visible:ring-primary mt-1 h-4 w-4 rounded focus-visible:ring-2 focus-visible:ring-offset-2 disabled:opacity-60"
+                        />
+                        <span>
+                          <span className="text-foreground block text-sm font-medium">
+                            {t.useAiLabel}
+                          </span>
+                          <span className="text-muted-foreground mt-0.5 block text-xs leading-relaxed">
+                            {t.useAiHint}
+                          </span>
+                        </span>
+                      </label>
+                    </div>
+                    <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
+                      <motion.button
+                        type="button"
+                        disabled={exportingFormat !== null}
+                        whileHover={{ scale: exportingFormat ? 1 : 1.02 }}
+                        whileTap={{ scale: exportingFormat ? 1 : 0.98 }}
+                        onClick={() => downloadImproved('docx')}
+                        className="bg-primary text-primary-foreground focus-visible:ring-primary inline-flex items-center justify-center gap-2 rounded-xl px-6 py-3 font-semibold transition-opacity focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none disabled:opacity-60"
+                      >
+                        {exportingFormat === 'docx' ? (
+                          <Loader2 className="h-5 w-5 animate-spin" aria-hidden />
+                        ) : (
+                          <Download className="h-5 w-5" aria-hidden />
+                        )}
+                        {exportingFormat === 'docx' ? t.exportLoading : t.downloadDocx}
+                      </motion.button>
+                      <motion.button
+                        type="button"
+                        disabled={exportingFormat !== null}
+                        whileHover={{ scale: exportingFormat ? 1 : 1.02 }}
+                        whileTap={{ scale: exportingFormat ? 1 : 0.98 }}
+                        onClick={() => downloadImproved('pdf')}
+                        className="border-border bg-background hover:bg-muted focus-visible:ring-primary inline-flex items-center justify-center gap-2 rounded-xl border px-6 py-3 font-semibold transition-colors focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none disabled:opacity-60"
+                      >
+                        {exportingFormat === 'pdf' ? (
+                          <Loader2 className="h-5 w-5 animate-spin" aria-hidden />
+                        ) : (
+                          <Download className="h-5 w-5" aria-hidden />
+                        )}
+                        {exportingFormat === 'pdf' ? t.exportLoading : t.downloadPdf}
+                      </motion.button>
+                    </div>
+                  </motion.div>
                 </div>
               </div>
             </motion.section>
