@@ -35,10 +35,7 @@ export async function POST(request: Request) {
     const sector = parseSector(form.get('sector'));
 
     if (!file || !(file instanceof File)) {
-      return NextResponse.json(
-        { error: 'Falta el archivo en el campo "file".' },
-        { status: 400 },
-      );
+      return NextResponse.json({ error: 'Falta el archivo en el campo "file".' }, { status: 400 });
     }
 
     const buffer = Buffer.from(await file.arrayBuffer());
@@ -78,8 +75,7 @@ export async function POST(request: Request) {
       return new NextResponse(new Uint8Array(docxBuffer), {
         status: 200,
         headers: {
-          'Content-Type':
-            'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+          'Content-Type': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
           'Content-Disposition': `attachment; filename="${base}_mejorado.docx"`,
         },
       });

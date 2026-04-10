@@ -72,7 +72,7 @@ export function UploadDropzone({ onFileSelect, isAnalyzing, language }: UploadDr
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
-      className={`relative w-full max-w-full touch-manipulation min-h-[220px] rounded-2xl border-2 border-dashed transition-colors md:min-h-[260px] ${
+      className={`relative min-h-[220px] w-full max-w-full touch-manipulation rounded-2xl border-2 border-dashed transition-colors md:min-h-[260px] ${
         isDragging
           ? 'border-primary bg-accent/50'
           : 'border-border bg-card hover:border-primary/35 hover:bg-muted/30'

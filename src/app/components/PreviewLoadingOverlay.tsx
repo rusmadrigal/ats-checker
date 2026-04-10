@@ -5,14 +5,14 @@ import { motion, AnimatePresence } from 'motion/react';
 import { Loader2, Sparkles } from 'lucide-react';
 
 const TIPS_ES = [
-  '¿Sabías que muchos ATS convierten tu CV a texto plano? Por eso importa la estructura clara y títulos reconocibles.',
-  '¿Sabías que las tablas complejas o columnas raras a veces se leen en orden incorrecto? Un diseño simple suele funcionar mejor.',
-  '¿Sabías que repetir palabras clave de la oferta (con naturalidad) puede mejorar el emparejamiento automático?',
-  '¿Sabías que las métricas concretas (%, plazos, tamaño de equipo) suelen destacar más que frases genéricas?',
-  '¿Sabías que archivos PDF con texto seleccionable suelen parsearse mejor que escaneos o imágenes?',
-  '¿Sabías que el nombre del puesto y fechas bien visibles ayudan a los parsers a entender tu experiencia?',
-  '¿Sabías que algunos sistemas puntúan según secciones detectadas? Encabezados como «Experiencia» o «Educación» ayudan.',
-  '¿Sabías que un solo archivo bien alineado con la oferta a menudo supera un CV «bonito» pero ambiguo para el ATS?',
+  'Muchos ATS convierten tu CV a texto plano: una estructura clara y títulos reconocibles marcan la diferencia.',
+  'Ojo: tablas muy complejas o columnas raras a veces se leen en orden incorrecto. Un diseño simple suele funcionar mejor.',
+  'Consejo: repetir palabras clave de la oferta (con naturalidad) puede mejorar el emparejamiento automático.',
+  'Las métricas concretas—porcentajes, plazos, tamaño de equipo—suelen destacar más que frases genéricas.',
+  'En la práctica, un PDF con texto seleccionable suele parsearse mejor que un escaneo o una imagen.',
+  'El nombre del puesto y las fechas bien visibles ayudan a los sistemas a entender tu experiencia.',
+  'Algunos ATS puntúan según secciones detectadas: encabezados como «Experiencia» o «Educación» facilitan el camino.',
+  'Un CV alineado con la oferta a menudo supera uno muy «bonito» pero ambiguo para el filtro automático.',
 ] as const;
 
 interface PreviewLoadingOverlayProps {

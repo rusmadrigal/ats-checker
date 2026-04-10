@@ -41,7 +41,12 @@ type AISuggestionsPanelProps = {
   onApplyCopy: (text: string) => void;
 };
 
-export function AISuggestionsPanel({ suggestions, title, labels, onApplyCopy }: AISuggestionsPanelProps) {
+export function AISuggestionsPanel({
+  suggestions,
+  title,
+  labels,
+  onApplyCopy,
+}: AISuggestionsPanelProps) {
   const items = buildItems(suggestions);
   if (items.length === 0) return null;
 

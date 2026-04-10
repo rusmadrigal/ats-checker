@@ -46,9 +46,9 @@ export function CookieConsent() {
           animate={{ opacity: 1, y: 0, scale: 1 }}
           exit={{ opacity: 0, y: 16, scale: 0.96 }}
           transition={{ type: 'spring', stiffness: 380, damping: 34 }}
-          className="fixed bottom-3 z-[95] w-[min(100%-1.5rem,22.5rem)] pb-[max(0.75rem,env(safe-area-inset-bottom))] left-[max(0.75rem,env(safe-area-inset-left))] sm:bottom-5 sm:left-[max(1.25rem,env(safe-area-inset-left))] sm:w-[min(100%-2.5rem,24rem)]"
+          className="fixed bottom-3 left-[max(0.75rem,env(safe-area-inset-left))] z-[95] w-[min(100%-1.5rem,22.5rem)] pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:bottom-5 sm:left-[max(1.25rem,env(safe-area-inset-left))] sm:w-[min(100%-2.5rem,24rem)]"
         >
-          <div className="border-border/45 from-card/98 shadow-primary/5 relative overflow-hidden rounded-2xl border bg-gradient-to-b to-card/90 shadow-2xl ring-1 ring-black/[0.04] backdrop-blur-2xl dark:ring-white/[0.06]">
+          <div className="border-border/45 from-card/98 shadow-primary/5 to-card/90 relative overflow-hidden rounded-2xl border bg-gradient-to-b shadow-2xl ring-1 ring-black/[0.04] backdrop-blur-2xl dark:ring-white/[0.06]">
             <div className="from-primary/[0.12] pointer-events-none absolute -top-12 -left-8 size-32 rounded-full bg-gradient-to-br to-transparent blur-2xl" />
             <div className="relative p-4 sm:p-5">
               <div className="flex gap-3.5">
@@ -63,8 +63,8 @@ export function CookieConsent() {
                     Uso de cookies
                   </p>
                   <p className="text-muted-foreground mt-2 text-xs leading-relaxed sm:text-[0.8125rem]">
-                    Solo utilizamos lo necesario para que el sitio funcione. Consulta la política o acepta
-                    para continuar.
+                    Solo utilizamos lo necesario para que el sitio funcione. Consulta la política o
+                    acepta para continuar.
                   </p>
                 </div>
               </div>
@@ -72,13 +72,13 @@ export function CookieConsent() {
                 <button
                   type="button"
                   onClick={handleAccept}
-                  className="bg-primary text-primary-foreground focus-visible:ring-primary inline-flex min-h-10 w-full items-center justify-center rounded-xl px-4 text-sm font-semibold shadow-md shadow-primary/15 transition-[opacity,transform] hover:opacity-95 active:scale-[0.99] focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none"
+                  className="bg-primary text-primary-foreground focus-visible:ring-primary shadow-primary/15 inline-flex min-h-10 w-full items-center justify-center rounded-xl px-4 text-sm font-semibold shadow-md transition-[opacity,transform] hover:opacity-95 focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none active:scale-[0.99]"
                 >
                   Aceptar
                 </button>
                 <Link
                   href="/cookies"
-                  className="text-muted-foreground hover:text-foreground focus-visible:ring-primary inline-flex min-h-9 w-full items-center justify-center rounded-lg text-center text-xs font-medium underline decoration-muted-foreground/50 underline-offset-2 transition-colors focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none"
+                  className="text-muted-foreground hover:text-foreground focus-visible:ring-primary decoration-muted-foreground/50 inline-flex min-h-9 w-full items-center justify-center rounded-lg text-center text-xs font-medium underline underline-offset-2 transition-colors focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none"
                 >
                   Ver política de cookies
                 </Link>

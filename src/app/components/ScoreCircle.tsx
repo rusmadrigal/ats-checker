@@ -28,12 +28,7 @@ export function ScoreCircle({
 
   return (
     <div className={cn('relative flex items-center justify-center', className)}>
-      <svg
-        width={(r + stroke) * 2}
-        height={(r + stroke) * 2}
-        className="-rotate-90"
-        aria-hidden
-      >
+      <svg width={(r + stroke) * 2} height={(r + stroke) * 2} className="-rotate-90" aria-hidden>
         <circle
           cx={r + stroke}
           cy={r + stroke}
@@ -51,7 +46,10 @@ export function ScoreCircle({
           strokeWidth={stroke}
           strokeLinecap="round"
           stroke="currentColor"
-          className={cn(good ? 'text-emerald-500' : 'text-amber-500', 'transition-all duration-500')}
+          className={cn(
+            good ? 'text-emerald-500' : 'text-amber-500',
+            'transition-all duration-500',
+          )}
           initial={{ strokeDashoffset: c }}
           animate={{ strokeDashoffset: offset }}
           transition={{ duration: 0.85, ease: [0.22, 1, 0.36, 1] }}
@@ -61,13 +59,13 @@ export function ScoreCircle({
       <div className="absolute inset-0 flex flex-col items-center justify-center">
         <span
           className={cn(
-            'text-foreground text-3xl font-semibold tabular-nums tracking-tight transition-all duration-500 sm:text-4xl',
+            'text-foreground text-3xl font-semibold tracking-tight tabular-nums transition-all duration-500 sm:text-4xl',
             scoreNumberClassName,
           )}
         >
           {score}
         </span>
-        <span className="text-muted-foreground mt-0.5 text-[10px] font-medium uppercase tracking-wider sm:text-xs">
+        <span className="text-muted-foreground mt-0.5 text-[10px] font-medium tracking-wider uppercase sm:text-xs">
           / {max}
         </span>
       </div>

@@ -45,14 +45,14 @@ Analyze the resume and return structured scores and lists.
 Rules:
 - Small edits should change the overall score slightly; major improvements change it more.
 - Removing important info lowers the score; adding relevant keywords usually raises it.
-- Missing contact (email, phone, or clear LinkedIn) lowers the score.
+- Missing contact (email, phone, or clear LinkedIn) lowers the score. In issues[], say the user must add their own real contact data; never imply a phone/URL will be auto-generated.
 - Weak or missing summary/profile lowers the score when the rest of the resume is long.
 - Strong, quantified achievements (metrics, %) increase the score.
 - Sub-scores (readability, keywords, formatting, experience) should be consistent with the overall score but can differ by a few points.
 
 DETAIL AND QA (strict — flag real problems in issues[], in Latin American Spanish):
 - Name / header: missing name, only placeholders ("Tu nombre", "John Doe" template), obvious spelling mistakes in how the person wrote their own name, inconsistent name vs signature elsewhere, ALL-CAPS name abuse.
-- Contact: invalid or incomplete email, missing @, fake domains, missing phone/LinkedIn when the profile is senior/long.
+- Contact: invalid or incomplete email, missing @, fake domains, missing phone/LinkedIn when the profile is senior/long. Wording example style: "Falta un canal de contacto directo (teléfono, LinkedIn o web): agrégalo tú en el CV; no se inventan datos personales."
 - Title / headline: empty with long experience, grammar errors, meaningless buzzwords only.
 - Summary: empty, too short, no value proposition, wrong language mix.
 - Experience: unclear dates, bullet points without outcomes, tense inconsistency, duplicate roles, gaps you can infer from text.

@@ -14,25 +14,51 @@ import {
   Trash2,
   ChevronDown,
   Sparkles,
+  RefreshCw,
 } from 'lucide-react';
 import { Toaster, toast } from 'sonner';
 import { PreviewLoadingOverlay } from './components/PreviewLoadingOverlay';
+import { renderIssueTextWithUserHighlights } from './components/issue-user-action-highlight';
 import { IssuesList, IssuesListFixWithAiButton } from './components/IssuesList';
 import { HowItWorksStep } from './components/HowItWorksStep';
-import { ResumeHarvardPreview } from './components/ResumeHarvardPreview';
+import {
+  ResumeHarvardPreview,
+  type ContactFieldHighlightFlags,
+} from './components/ResumeHarvardPreview';
 import { HeroAIAnalysis } from './components/HeroAIAnalysis';
 import { ATSScoreCard } from './components/ATSScoreCard';
 import { AISuggestionsPanel } from './components/AISuggestionsPanel';
 import { ResumePreview } from './components/ResumePreview';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from './components/ui/alert-dialog';
+import { Button } from './components/ui/button';
 import { Skeleton } from './components/ui/skeleton';
 import { deriveAtsInsights, type AtsInsightMetrics } from '@/src/lib/ats-score-insights';
 import { analyzeResumeText } from '@/src/lib/analyze-resume-heuristics';
+import { hasSecondaryContactChannel } from '@/src/lib/contact-patterns';
 import type { AnalysisIssue, AnalysisResult } from '@/src/lib/analysis-types';
 import { buildPlaintextFromStructured } from '@/src/lib/build-plaintext-from-structured';
+import { exportResumeHtmlToPdf } from '@/src/lib/export-resume-html-to-pdf';
 import { buildSectionsOutline } from '@/src/lib/build-sections-outline';
 import type { AiRescoreResult } from '@/src/lib/re-score-resume-ai';
 import type { CvApprovalMap, CvStructured } from '@/src/lib/cv-structured-types';
-import { defaultApprovalsForCv } from '@/src/lib/cv-structured-types';
+import {
+  createEmptyEducationEntry,
+  createEmptyExperienceEntry,
+  defaultApprovalsForCv,
+  remapApprovalsAfterBulletDelete,
+  remapApprovalsAfterExperienceDelete,
+  remapApprovalsAfterSkillAddedDelete,
+  remapApprovalsAfterSkillRowDelete,
+} from '@/src/lib/cv-structured-types';
 import { cloneCvStructured } from '@/src/lib/cv-structured-clone';
 import {
   clearPreviewSessionStorage,
@@ -101,7 +127,7 @@ const translations = {
     atsExplainP7:
       'Un CV «amigable para ATS» no sustituye una buena trayectoria: solo evita que se pierda información técnica en el camino. Después del filtro automático, suele haber revisión humana; el documento debe seguir siendo honesto, legible y fácil de escanear en pantalla o en impreso.',
     footerCopyright: '© 2026 ATS Resume Checker.',
-    footerNonProfit: 'Proyecto sin ánimo de lucro, creado por',
+    footerNonProfit: 'Optimizador de CV con IA · Creado por',
     authorName: 'Rus Madrigal',
     howItWorksTitle: 'Cómo funciona',
     step1Title: 'Sube tu currículum',
@@ -163,8 +189,18 @@ const translations = {
     afterTab: 'Después',
     fixIssuesWithAi: 'Corregir problemas con IA',
     fixIssuesLoading: 'Aplicando correcciones…',
-    fixIssuesSuccess: 'Listo: el CV se actualizó según los problemas detectados. Revísalo en la vista previa.',
-    fixIssuesError: 'No se pudo aplicar las correcciones. Revisa tu clave de OpenAI o inténtalo de nuevo.',
+    fixIssuesSuccess:
+      'Listo: el CV se actualizó según los problemas detectados. Revísalo en la vista previa.',
+    fixIssuesError:
+      'No se pudo aplicar las correcciones. Revisa tu clave de OpenAI o inténtalo de nuevo.',
+    fixIssuesConfirmTitle: 'Confirmar corrección con IA',
+    fixIssuesConfirmIntro:
+      'La IA ajustará el texto de tu vista previa solo para abordar los problemas de esta lista. No inventará datos de contacto (teléfono, correo, enlaces, LinkedIn): si faltan, tendrás que añadirlos tú en el editor.',
+    fixIssuesConfirmListLabel: 'Se tendrán en cuenta estos puntos:',
+    fixIssuesConfirmApply: 'Sí, aplicar correcciones',
+    fixIssuesConfirmCancel: 'Cancelar',
+    refreshIssuesList: 'Actualizar lista de problemas',
+    refreshIssuesListToast: 'Lista de problemas actualizada según tu vista previa actual.',
   },
 } as const;
 
@@ -174,15 +210,20 @@ const language = 'es' as const;
 
 const MAX_FILE_BYTES = 10 * 1024 * 1024;
 
-function issueTypeFromAiText(text: string): AnalysisIssue['type'] {
-  if (
-    /\bfalta\b|\bno (hay|se detect|aparece)\b|\bmissing\b|\bsin email\b|\bsin contacto\b/i.test(
-      text,
-    )
-  ) {
-    return 'error';
-  }
-  return 'warning';
+function safeExportBasename(name: string | null | undefined): string {
+  const raw = (name ?? 'cv').replace(/\.[^/.]+$/, '');
+  const ascii = raw
+    .normalize('NFD')
+    .replace(/\p{M}/gu, '')
+    .replace(/[^\w\-]+/g, '_')
+    .replace(/_+/g, '_')
+    .replace(/^_|_$/g, '');
+  return ascii.slice(0, 80) || 'cv';
+}
+
+function issuesFromCvStructured(cv: CvStructured, appr: CvApprovalMap): AnalysisIssue[] {
+  const text = buildPlaintextFromStructured(cv, appr);
+  return analyzeResumeText(text).issues;
 }
 
 export default function App() {
@@ -210,9 +251,17 @@ export default function App() {
   const [aiLive, setAiLive] = useState<AiRescoreResult | null>(null);
   const [aiLivePending, setAiLivePending] = useState(false);
   const [fixIssuesLoading, setFixIssuesLoading] = useState(false);
+  const [fixIssuesConfirmOpen, setFixIssuesConfirmOpen] = useState(false);
+  /**
+   * Con vista previa: incidencias congeladas en un análisis local (no las de re-score IA),
+   * para que la lista no cambie a cada pulsación. Se renueva al generar vista previa, al
+   * corregir con IA o al pulsar «Actualizar lista de problemas».
+   */
+  const [pinnedIssues, setPinnedIssues] = useState<AnalysisIssue[] | null>(null);
   const aiRescoreRequestId = useRef(0);
   const lastAiScoreRef = useRef<number | null>(null);
   const aiFetchAbortRef = useRef<AbortController | null>(null);
+  const resumeDocumentExportRef = useRef<HTMLDivElement | null>(null);
 
   /** Puntuación e incidencias alineadas con el texto que exportarías (vista previa + aprobaciones). */
   const effectiveAnalysis = useMemo((): AnalysisResult | null => {
@@ -223,15 +272,10 @@ export default function App() {
   }, [analysis, structuredPreview, approvals]);
 
   const displayIssues = useMemo((): AnalysisIssue[] => {
+    if (structuredPreview !== null && pinnedIssues !== null) return pinnedIssues;
     if (!effectiveAnalysis) return [];
-    if (structuredPreview && aiLive) {
-      return aiLive.issues.map((text) => ({
-        type: issueTypeFromAiText(text),
-        text,
-      }));
-    }
     return effectiveAnalysis.issues;
-  }, [effectiveAnalysis, structuredPreview, aiLive]);
+  }, [structuredPreview, pinnedIssues, effectiveAnalysis]);
 
   const displayScore = aiLive && structuredPreview ? aiLive.score : (effectiveAnalysis?.score ?? 0);
 
@@ -249,6 +293,40 @@ export default function App() {
     }
     return deriveAtsInsights(effectiveAnalysis.score, effectiveAnalysis.issues);
   }, [effectiveAnalysis, structuredPreview, aiLive]);
+
+  const contactFieldHighlight = useMemo((): ContactFieldHighlightFlags | undefined => {
+    if (previewReadOnly || !structuredPreview) return undefined;
+    const blob = displayIssues.map((i) => i.text).join('\n');
+    const lower = blob.toLowerCase();
+    const mentionsGap =
+      /\b(missing|no\s|not\s|falta|sin\s|agrega|añade|incluye|add|provide|include)\b/i.test(lower);
+    const gapEmail =
+      mentionsGap && /email|correo|e-mail|\bmail\b|contact info|datos de contacto/i.test(blob);
+    const gapPhoneLink =
+      mentionsGap &&
+      /phone|teléfono|telefono|linkedin|link|enlace|url|website|sitio|contact channel|canal de contacto|whatsapp|número telef|numero telef/i.test(
+        blob,
+      );
+    const gapName =
+      mentionsGap &&
+      /\bname\b|nombre/i.test(blob) &&
+      /name|nombre|full name|nombre completo/i.test(blob);
+
+    const emailStr = (structuredPreview.header?.email ?? '').trim();
+    const locationStr = (structuredPreview.header?.location ?? '').trim();
+    const nameStr = (structuredPreview.header?.name ?? '').trim();
+    const hasChannel = hasSecondaryContactChannel(`${locationStr} ${emailStr}`);
+
+    const flags: ContactFieldHighlightFlags = {};
+    if (gapEmail && !emailStr) flags.email = true;
+    if (gapPhoneLink && !hasChannel) {
+      flags.location = true;
+      flags.email = true;
+    }
+    if (gapName && !nameStr) flags.name = true;
+
+    return Object.keys(flags).length ? flags : undefined;
+  }, [displayIssues, structuredPreview, previewReadOnly]);
 
   useEffect(() => {
     if (!structuredPreview || !analysis) {
@@ -346,6 +424,7 @@ export default function App() {
     setStructuredPreview(p.structured);
     setStructuredBaseline(cloneCvStructured(p.baseline));
     setApprovals(p.approvals);
+    setPinnedIssues(issuesFromCvStructured(p.structured, p.approvals));
     setAiLive(null);
     lastAiScoreRef.current = null;
     setPreviewReadOnly(p.previewReadOnly);
@@ -396,6 +475,7 @@ export default function App() {
     setStructuredPreview(null);
     setStructuredBaseline(null);
     setApprovals({});
+    setPinnedIssues(null);
     setPreviewReadOnly(false);
     setPersistFileKey(null);
     setPersistFileName(null);
@@ -423,6 +503,7 @@ export default function App() {
       setStructuredPreview(null);
       setStructuredBaseline(null);
       setApprovals({});
+      setPinnedIssues(null);
       setPreviewReadOnly(false);
       setPersistFileKey(null);
       setPersistFileName(null);
@@ -460,6 +541,7 @@ export default function App() {
         setStructuredPreview(storedBefore.structured);
         setStructuredBaseline(cloneCvStructured(storedBefore.baseline));
         setApprovals(storedBefore.approvals);
+        setPinnedIssues(issuesFromCvStructured(storedBefore.structured, storedBefore.approvals));
         setPreviewReadOnly(storedBefore.previewReadOnly);
         toast(t.previewRecoveredNoTokens, { duration: 3000 });
       } else {
@@ -497,10 +579,12 @@ export default function App() {
         throw new Error('Respuesta de vista previa no válida.');
       }
       const structured = (data as { structured: CvStructured }).structured;
+      const appr = defaultApprovalsForCv(structured);
       setStructuredPreview(structured);
       setStructuredBaseline(cloneCvStructured(structured));
       setPreviewReadOnly(true);
-      setApprovals(defaultApprovalsForCv(structured));
+      setApprovals(appr);
+      setPinnedIssues(issuesFromCvStructured(structured, appr));
       setPersistFileKey(fileKeyFromFile(file));
       setPersistFileName(file.name);
       toast.success(replaceExisting ? 'Vista previa actualizada.' : 'Vista previa lista.');
@@ -537,7 +621,7 @@ export default function App() {
     window.setTimeout(() => setPreviewPulse(false), 1800);
   };
 
-  const handleFixIssuesWithAi = async () => {
+  const runFixIssuesWithAi = async () => {
     if (!structuredPreview || displayIssues.length === 0) return;
     setFixIssuesLoading(true);
     setAiLive(null);
@@ -571,12 +655,12 @@ export default function App() {
         throw new Error(t.fixIssuesError);
       }
       const next = (data as { structured: CvStructured }).structured;
+      const appr = defaultApprovalsForCv(next);
       setStructuredPreview(next);
-      setApprovals(defaultApprovalsForCv(next));
+      setApprovals(appr);
+      setPinnedIssues(issuesFromCvStructured(next, appr));
       setAiLive(null);
       aiRescoreRequestId.current += 1;
-      aiFetchAbortRef.current?.abort();
-      aiFetchAbortRef.current = null;
       toast.success(t.fixIssuesSuccess);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : t.fixIssuesError);
@@ -591,6 +675,125 @@ export default function App() {
 
   const handleStructuredChange = (next: CvStructured) => {
     setStructuredPreview(next);
+  };
+
+  const handleDeleteExperience = (index: number) => {
+    if (!structuredPreview) return;
+    setStructuredPreview({
+      ...structuredPreview,
+      experience: structuredPreview.experience.filter((_, i) => i !== index),
+    });
+    setApprovals((prev) => remapApprovalsAfterExperienceDelete(prev, index));
+  };
+
+  const handleDeleteExpBullet = (expIndex: number, bulletIndex: number) => {
+    if (!structuredPreview) return;
+    const experience = structuredPreview.experience.map((e, i) => {
+      if (i !== expIndex) return e;
+      return {
+        ...e,
+        original: e.original.filter((_, j) => j !== bulletIndex),
+        improved: e.improved.filter((_, j) => j !== bulletIndex),
+        changes: e.changes.filter((_, j) => j !== bulletIndex),
+      };
+    });
+    setStructuredPreview({ ...structuredPreview, experience });
+    setApprovals((prev) => remapApprovalsAfterBulletDelete(prev, expIndex, bulletIndex));
+  };
+
+  const handleDeleteSkillRow = (skillIndex: number) => {
+    if (!structuredPreview) return;
+    const original = [...structuredPreview.skills.original];
+    const improved = [...structuredPreview.skills.improved];
+    const maxLen = Math.max(original.length, improved.length);
+    if (skillIndex < 0 || skillIndex >= maxLen) return;
+    if (skillIndex < original.length) original.splice(skillIndex, 1);
+    if (skillIndex < improved.length) improved.splice(skillIndex, 1);
+    setStructuredPreview({
+      ...structuredPreview,
+      skills: { ...structuredPreview.skills, original, improved },
+    });
+    setApprovals((prev) => remapApprovalsAfterSkillRowDelete(prev, skillIndex));
+  };
+
+  const handleDeleteSkillAdded = (addedIndex: number) => {
+    if (!structuredPreview) return;
+    setStructuredPreview({
+      ...structuredPreview,
+      skills: {
+        ...structuredPreview.skills,
+        added: structuredPreview.skills.added.filter((_, i) => i !== addedIndex),
+      },
+    });
+    setApprovals((prev) => remapApprovalsAfterSkillAddedDelete(prev, addedIndex));
+  };
+
+  const handleDeleteEducation = (index: number) => {
+    if (!structuredPreview) return;
+    setStructuredPreview({
+      ...structuredPreview,
+      education: structuredPreview.education.filter((_, i) => i !== index),
+    });
+  };
+
+  const handleAddExperience = () => {
+    if (!structuredPreview) return;
+    const i = structuredPreview.experience.length;
+    setStructuredPreview({
+      ...structuredPreview,
+      experience: [...structuredPreview.experience, createEmptyExperienceEntry()],
+    });
+    setApprovals((prev) => ({ ...prev, [`exp-${i}-bullet-0`]: true }));
+  };
+
+  const handleAddExpBullet = (expIndex: number) => {
+    if (!structuredPreview) return;
+    const e = structuredPreview.experience[expIndex];
+    if (!e) return;
+    const j = Math.max(e.original.length, e.improved.length);
+    const experience = structuredPreview.experience.map((row, i) =>
+      i === expIndex
+        ? { ...row, original: [...row.original, ''], improved: [...row.improved, ''] }
+        : row,
+    );
+    setStructuredPreview({ ...structuredPreview, experience });
+    setApprovals((prev) => ({ ...prev, [`exp-${expIndex}-bullet-${j}`]: true }));
+  };
+
+  const handleAddEducation = () => {
+    if (!structuredPreview) return;
+    setStructuredPreview({
+      ...structuredPreview,
+      education: [...structuredPreview.education, createEmptyEducationEntry()],
+    });
+  };
+
+  const handleAddSkillRow = () => {
+    if (!structuredPreview) return;
+    const o = [...structuredPreview.skills.original];
+    const im = [...structuredPreview.skills.improved];
+    const maxL = Math.max(o.length, im.length);
+    while (o.length < maxL) o.push('');
+    while (im.length < maxL) im.push('');
+    o.push('');
+    im.push('');
+    const i = o.length - 1;
+    setStructuredPreview({
+      ...structuredPreview,
+      skills: { ...structuredPreview.skills, original: o, improved: im },
+    });
+    setApprovals((prev) => ({ ...prev, [`skill-${i}`]: true }));
+  };
+
+  const handleAddSkillAdded = () => {
+    if (!structuredPreview) return;
+    const added = [...structuredPreview.skills.added, ''];
+    const i = added.length - 1;
+    setStructuredPreview({
+      ...structuredPreview,
+      skills: { ...structuredPreview.skills, added },
+    });
+    setApprovals((prev) => ({ ...prev, [`skill-added-${i}`]: true }));
   };
 
   const revertAllFromAi = () => {
@@ -674,6 +877,26 @@ export default function App() {
     }
     setExportingFormat(format);
     try {
+      if (format === 'pdf' && structuredPreview) {
+        const el = resumeDocumentExportRef.current;
+        if (!el) {
+          throw new Error('La vista previa aún no está lista para exportar.');
+        }
+        const prevReadOnly = previewReadOnly;
+        setPreviewReadOnly(true);
+        await new Promise<void>((resolve) => {
+          requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
+        });
+        try {
+          const base = safeExportBasename(persistFileName ?? uploadedFile.name);
+          await exportResumeHtmlToPdf(el, `${base}_mejorado.pdf`);
+          toast.success(t.exportSuccess);
+        } finally {
+          if (!prevReadOnly) setPreviewReadOnly(false);
+        }
+        return;
+      }
+
       const body = new FormData();
       body.append('file', uploadedFile);
       body.append('format', format);
@@ -828,27 +1051,117 @@ export default function App() {
                           </p>
                         </motion.div>
                       ) : effectiveAnalysis ? (
-                        <IssuesList
-                          key={displayIssues
-                            .map((i) => i.text)
-                            .join('|')
-                            .slice(0, 120)}
-                          issues={displayIssues}
-                          title={t.issuesTitle}
-                          footer={
-                            structuredPreview ? (
-                              <IssuesListFixWithAiButton
-                                label={t.fixIssuesWithAi}
-                                loadingLabel={t.fixIssuesLoading}
-                                onClick={() => void handleFixIssuesWithAi()}
-                                disabled={
-                                  previewLoading || fixIssuesLoading || exportingFormat !== null
-                                }
-                                loading={fixIssuesLoading}
-                              />
-                            ) : null
-                          }
-                        />
+                        <>
+                          <IssuesList
+                            key={displayIssues
+                              .map((i) => i.text)
+                              .join('|')
+                              .slice(0, 120)}
+                            issues={displayIssues}
+                            title={t.issuesTitle}
+                            footer={
+                              structuredPreview ? (
+                                <div className="space-y-3">
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    className="w-full gap-2 border-dashed font-sans text-xs font-medium"
+                                    disabled={
+                                      previewLoading || fixIssuesLoading || exportingFormat !== null
+                                    }
+                                    onClick={() => {
+                                      setPinnedIssues(
+                                        issuesFromCvStructured(structuredPreview, approvals),
+                                      );
+                                      toast.success(t.refreshIssuesListToast);
+                                    }}
+                                  >
+                                    <RefreshCw className="size-3.5 shrink-0" aria-hidden />
+                                    {t.refreshIssuesList}
+                                  </Button>
+                                  <IssuesListFixWithAiButton
+                                    label={t.fixIssuesWithAi}
+                                    loadingLabel={t.fixIssuesLoading}
+                                    onClick={() => setFixIssuesConfirmOpen(true)}
+                                    disabled={
+                                      previewLoading || fixIssuesLoading || exportingFormat !== null
+                                    }
+                                    loading={false}
+                                  />
+                                </div>
+                              ) : null
+                            }
+                          />
+                          <AlertDialog
+                            open={fixIssuesConfirmOpen}
+                            onOpenChange={(open) => {
+                              if (!fixIssuesLoading) setFixIssuesConfirmOpen(open);
+                            }}
+                          >
+                            <AlertDialogContent className="max-w-lg">
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>{t.fixIssuesConfirmTitle}</AlertDialogTitle>
+                                <AlertDialogDescription asChild>
+                                  <div className="space-y-3">
+                                    <p>{t.fixIssuesConfirmIntro}</p>
+                                    <p className="text-foreground text-sm font-medium">
+                                      {t.fixIssuesConfirmListLabel}
+                                    </p>
+                                    <ul className="border-border/60 bg-muted/30 max-h-[min(50vh,16rem)] list-none space-y-2 overflow-y-auto rounded-lg border p-3 text-sm">
+                                      {displayIssues.map((issue, idx) => (
+                                        <li
+                                          key={`${idx}-${issue.text.slice(0, 48)}`}
+                                          className="text-foreground flex gap-2 leading-relaxed"
+                                        >
+                                          <span
+                                            className="text-muted-foreground w-6 shrink-0 font-medium"
+                                            aria-hidden
+                                          >
+                                            {idx + 1}.
+                                          </span>
+                                          <span className="min-w-0 flex-1">
+                                            {renderIssueTextWithUserHighlights(issue.text)}
+                                          </span>
+                                        </li>
+                                      ))}
+                                    </ul>
+                                  </div>
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel disabled={fixIssuesLoading}>
+                                  {t.fixIssuesConfirmCancel}
+                                </AlertDialogCancel>
+                                <AlertDialogAction
+                                  disabled={
+                                    fixIssuesLoading ||
+                                    !structuredPreview ||
+                                    displayIssues.length === 0
+                                  }
+                                  onClick={(e) => {
+                                    e.preventDefault();
+                                    void (async () => {
+                                      await runFixIssuesWithAi();
+                                      setFixIssuesConfirmOpen(false);
+                                    })();
+                                  }}
+                                >
+                                  {fixIssuesLoading ? (
+                                    <>
+                                      <Loader2
+                                        className="mr-2 inline size-4 animate-spin"
+                                        aria-hidden
+                                      />
+                                      {t.fixIssuesLoading}
+                                    </>
+                                  ) : (
+                                    t.fixIssuesConfirmApply
+                                  )}
+                                </AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
+                        </>
                       ) : null}
                       {effectiveAnalysis ? (
                         <div className="border-border/60 from-background/95 to-background/80 w-full rounded-2xl border bg-gradient-to-b shadow-sm ring-1 ring-black/[0.04] backdrop-blur-md dark:ring-white/[0.06]">
@@ -1033,6 +1346,7 @@ export default function App() {
                             onStructuredChange={handleStructuredChange}
                             language={language}
                             readOnly={previewReadOnly}
+                            contactHighlight={contactFieldHighlight}
                             onReadOnlyChange={setPreviewReadOnly}
                             baseline={structuredBaseline}
                             onRevertAll={revertAllFromAi}
@@ -1042,6 +1356,17 @@ export default function App() {
                             onRevertBullet={revertBulletFromAi}
                             onRevertSkills={revertSkillsFromAi}
                             onRevertEducation={revertEducationFromAi}
+                            onDeleteExperience={handleDeleteExperience}
+                            onDeleteExpBullet={handleDeleteExpBullet}
+                            onDeleteSkillRow={handleDeleteSkillRow}
+                            onDeleteSkillAdded={handleDeleteSkillAdded}
+                            onDeleteEducation={handleDeleteEducation}
+                            documentExportRef={resumeDocumentExportRef}
+                            onAddExperience={handleAddExperience}
+                            onAddExpBullet={handleAddExpBullet}
+                            onAddEducation={handleAddEducation}
+                            onAddSkillRow={handleAddSkillRow}
+                            onAddSkillAdded={handleAddSkillAdded}
                           />
                         </motion.div>
                       ) : null}
@@ -1159,7 +1484,6 @@ export default function App() {
                 >
                   {t.authorName}
                 </Link>
-                .
               </p>
             </div>
             <nav

@@ -61,6 +61,25 @@ export const cvStructuredSchema = z.object({
 
 export type CvStructured = z.infer<typeof cvStructuredSchema>;
 
+export type CvExperienceEntry = CvStructured['experience'][number];
+export type CvEducationEntry = CvStructured['education'][number];
+
+export function createEmptyExperienceEntry(): CvExperienceEntry {
+  return {
+    title: '',
+    company: '',
+    location: '',
+    period: '',
+    original: [''],
+    improved: [''],
+    changes: [],
+  };
+}
+
+export function createEmptyEducationEntry(): CvEducationEntry {
+  return { degree: '', institution: '', period: '' };
+}
+
 export type CvApprovalMap = Record<string, boolean>;
 
 export function defaultApprovalsForCv(cv: CvStructured): CvApprovalMap {
@@ -79,4 +98,95 @@ export function defaultApprovalsForCv(cv: CvStructured): CvApprovalMap {
     m[`skill-added-${i}`] = true;
   });
   return m;
+}
+
+const EXP_BULLET_KEY = /^exp-(\d+)-bullet-(\d+)$/;
+
+/** Tras borrar un bloque de experiencia, reindexa claves `exp-i-bullet-j` en aprobaciones. */
+export function remapApprovalsAfterExperienceDelete(
+  approvals: CvApprovalMap,
+  deletedIndex: number,
+): CvApprovalMap {
+  const next: CvApprovalMap = {};
+  for (const [k, v] of Object.entries(approvals)) {
+    const m = EXP_BULLET_KEY.exec(k);
+    if (m) {
+      const ei = Number(m[1]);
+      const bi = Number(m[2]);
+      if (ei === deletedIndex) continue;
+      const newEi = ei > deletedIndex ? ei - 1 : ei;
+      next[`exp-${newEi}-bullet-${bi}`] = v;
+    } else {
+      next[k] = v;
+    }
+  }
+  return next;
+}
+
+/** Tras borrar una viñeta, reindexa las claves de ese bloque de experiencia. */
+export function remapApprovalsAfterBulletDelete(
+  approvals: CvApprovalMap,
+  expIndex: number,
+  deletedBulletIndex: number,
+): CvApprovalMap {
+  const next: CvApprovalMap = {};
+  for (const [k, v] of Object.entries(approvals)) {
+    const m = EXP_BULLET_KEY.exec(k);
+    if (m) {
+      const ei = Number(m[1]);
+      const bi = Number(m[2]);
+      if (ei !== expIndex) {
+        next[k] = v;
+        continue;
+      }
+      if (bi === deletedBulletIndex) continue;
+      const newBi = bi > deletedBulletIndex ? bi - 1 : bi;
+      next[`exp-${ei}-bullet-${newBi}`] = v;
+    } else {
+      next[k] = v;
+    }
+  }
+  return next;
+}
+
+const SKILL_KEY = /^skill-(\d+)$/;
+
+export function remapApprovalsAfterSkillRowDelete(
+  approvals: CvApprovalMap,
+  deletedIndex: number,
+): CvApprovalMap {
+  const next: CvApprovalMap = {};
+  for (const [k, v] of Object.entries(approvals)) {
+    const m = SKILL_KEY.exec(k);
+    if (m) {
+      const i = Number(m[1]);
+      if (i === deletedIndex) continue;
+      const newI = i > deletedIndex ? i - 1 : i;
+      next[`skill-${newI}`] = v;
+    } else {
+      next[k] = v;
+    }
+  }
+  return next;
+}
+
+const SKILL_ADDED_KEY = /^skill-added-(\d+)$/;
+
+export function remapApprovalsAfterSkillAddedDelete(
+  approvals: CvApprovalMap,
+  deletedIndex: number,
+): CvApprovalMap {
+  const next: CvApprovalMap = {};
+  for (const [k, v] of Object.entries(approvals)) {
+    const m = SKILL_ADDED_KEY.exec(k);
+    if (m) {
+      const i = Number(m[1]);
+      if (i === deletedIndex) continue;
+      const newI = i > deletedIndex ? i - 1 : i;
+      next[`skill-added-${newI}`] = v;
+    } else {
+      next[k] = v;
+    }
+  }
+  return next;
 }

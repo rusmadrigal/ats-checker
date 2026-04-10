@@ -58,7 +58,7 @@ export function ImprovementCard({
         </div>
       </div>
 
-      <div className="mt-3 inline-flex rounded-lg border border-border/60 bg-muted/30 p-0.5">
+      <div className="border-border/60 bg-muted/30 mt-3 inline-flex rounded-lg border p-0.5">
         <button
           type="button"
           onClick={() => setMode('before')}
@@ -95,7 +95,7 @@ export function ImprovementCard({
           className={cn(
             'mt-3 rounded-lg border px-3 py-2.5 text-xs leading-relaxed',
             mode === 'after'
-              ? 'border-emerald-500/25 bg-emerald-500/[0.06] text-foreground'
+              ? 'text-foreground border-emerald-500/25 bg-emerald-500/[0.06]'
               : 'border-border/60 bg-muted/20 text-muted-foreground',
           )}
         >

@@ -28,7 +28,7 @@ export function HeroAIAnalysis({
   return (
     <section className="relative overflow-hidden">
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_80%_60%_at_50%_-30%,hsl(var(--primary)/0.14),transparent)]" />
-      <div className="relative mx-auto max-w-2xl px-4 pb-16 pt-12 sm:px-6 sm:pb-20 sm:pt-16 md:pt-20">
+      <div className="relative mx-auto max-w-2xl px-4 pt-12 pb-16 sm:px-6 sm:pt-16 sm:pb-20 md:pt-20">
         <motion.div
           initial={{ opacity: 0, y: 24 }}
           animate={{ opacity: 1, y: 0 }}
@@ -45,7 +45,7 @@ export function HeroAIAnalysis({
             {badge}
           </motion.div>
 
-          <h1 className="font-display text-foreground text-[1.65rem] font-bold leading-[1.12] tracking-tight sm:text-4xl md:text-[2.65rem]">
+          <h1 className="font-display text-foreground text-[1.65rem] leading-[1.12] font-bold tracking-tight sm:text-4xl md:text-[2.65rem]">
             {title}
           </h1>
           <p className="text-muted-foreground mx-auto mt-4 max-w-md text-base leading-relaxed sm:text-lg">
@@ -58,7 +58,7 @@ export function HeroAIAnalysis({
             transition={{ delay: 0.2, duration: 0.5 }}
             className="border-border/40 bg-background/40 mt-10 rounded-2xl border p-1 shadow-[0_8px_40px_-20px_rgba(0,0,0,0.2)] backdrop-blur-xl"
           >
-            <div className="rounded-[14px] bg-background/80 p-3 sm:p-4">
+            <div className="bg-background/80 rounded-[14px] p-3 sm:p-4">
               <UploadDropzone
                 onFileSelect={onFileSelect}
                 isAnalyzing={isAnalyzing}
@@ -78,7 +78,7 @@ export function HeroAIAnalysis({
             </motion.p>
           ) : null}
           {sessionHint ? (
-            <p className="text-amber-900/90 mt-2 max-w-md mx-auto text-center text-xs leading-relaxed">
+            <p className="mx-auto mt-2 max-w-md text-center text-xs leading-relaxed text-amber-900/90">
               {sessionHint}
             </p>
           ) : null}

@@ -11,10 +11,7 @@ export async function POST(request: Request) {
     const file = form.get('file');
 
     if (!file || !(file instanceof File)) {
-      return NextResponse.json(
-        { error: 'Falta el archivo en el campo "file".' },
-        { status: 400 },
-      );
+      return NextResponse.json({ error: 'Falta el archivo en el campo "file".' }, { status: 400 });
     }
 
     const buffer = Buffer.from(await file.arrayBuffer());

@@ -35,7 +35,11 @@ export function ApplyButton({
         className,
       )}
     >
-      {applied ? <Check className="size-3.5" aria-hidden /> : <Sparkles className="size-3.5" aria-hidden />}
+      {applied ? (
+        <Check className="size-3.5" aria-hidden />
+      ) : (
+        <Sparkles className="size-3.5" aria-hidden />
+      )}
       {children}
     </motion.button>
   );

@@ -1,6 +1,9 @@
+'use client';
+
 import type { ReactNode } from 'react';
 import { motion } from 'motion/react';
 import { AlertCircle, AlertTriangle, Loader2, Sparkles } from 'lucide-react';
+import { renderIssueTextWithUserHighlights } from './issue-user-action-highlight';
 
 interface Issue {
   type: 'error' | 'warning';
@@ -45,7 +48,7 @@ export function IssuesList({ issues, title, footer }: IssuesListProps) {
               )}
             </div>
             <p className="text-foreground flex-1 pt-1 text-sm leading-relaxed md:text-base">
-              {issue.text}
+              {renderIssueTextWithUserHighlights(issue.text)}
             </p>
           </motion.div>
         ))}
@@ -77,7 +80,7 @@ export function IssuesListFixWithAiButton({
       whileTap={{ scale: disabled || loading ? 1 : 0.99 }}
       onClick={onClick}
       disabled={disabled || loading}
-      className="bg-primary text-primary-foreground focus-visible:ring-primary inline-flex w-full min-h-10 items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-xs font-semibold shadow-sm transition-colors focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none disabled:opacity-55"
+      className="bg-primary text-primary-foreground focus-visible:ring-primary inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-xs font-semibold shadow-sm transition-colors focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none disabled:opacity-55"
     >
       {loading ? (
         <Loader2 className="size-4 shrink-0 animate-spin" aria-hidden />

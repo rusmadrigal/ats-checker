@@ -37,8 +37,9 @@ Tarea: devuelve el MISMO esquema (objeto CvStructured completo) aplicando correc
 
 Reglas estrictas:
 - No inventes empresas, fechas, titulaciones, idiomas ni cifras que no puedan inferirse del contenido actual.
-- Puedes corregir ortografía evidente en nombres propios, titulares y viñetas; mejorar redacción y claridad; unificar formato de fechas o correo si el problema lo sugiere.
-- Si el problema indica "falta email" y no hay ninguno en el texto, no inventes un correo: deja email vacío o el placeholder actual y mejora otras partes.
+- Datos de contacto personales: nunca inventes ni completes teléfono, correo electrónico, URL, LinkedIn ni WhatsApp. Si un problema pide «añadir contacto» y el usuario no los ha puesto, mejora el resto del CV, deja header.email y demás campos tal como estén (o vacíos) y añade UNA línea breve en ats.improvements indicando que debe completar teléfono/LinkedIn/web con sus datos reales en el editor (mismo idioma que el CV).
+- Puedes corregir ortografía evidente en nombres propios, titulares y viñetas; mejorar redacción y claridad; unificar formato de fechas o de un email que YA exista en el JSON (sin cambiar el dominio ni el usuario por uno inventado).
+- Si el problema indica "falta email" y no hay ninguno en el contenido, no inventes un correo: deja email vacío o el valor actual y mejora otras partes.
 - Si piden más métricas: refuerza viñetas solo con cuantificación que ya exista o que se pueda expresar sin números nuevos (p. ej. "equipo grande" → no pongas "50 personas" si no está).
 - Mantén meta (layout, style, font, accentColor) salvo que un problema sea explícitamente de diseño textual.
 - experience: conserva el número de puestos; cada puesto debe tener el mismo número de viñetas en original e improved (empareja índices).

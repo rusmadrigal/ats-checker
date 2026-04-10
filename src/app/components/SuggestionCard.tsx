@@ -53,10 +53,7 @@ export function SuggestionCard({ suggestions, title, language }: SuggestionCardP
     >
       <h3 className="text-foreground mb-3 text-lg font-semibold md:text-xl">{title}</h3>
       <p className="text-muted-foreground mb-6 flex gap-2.5 text-sm leading-relaxed">
-        <Info
-          className="text-primary mt-0.5 size-4 shrink-0 opacity-90"
-          aria-hidden
-        />
+        <Info className="text-primary mt-0.5 size-4 shrink-0 opacity-90" aria-hidden />
         <span>{t.intro}</span>
       </p>
 

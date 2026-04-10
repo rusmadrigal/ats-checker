@@ -26,20 +26,20 @@ Most large employers use ATS software to filter resumes before a human reads the
 
 ## Tech stack
 
-| Area        | Choice                                      |
-| ----------- | ------------------------------------------- |
-| Framework   | [Next.js](https://nextjs.org/) 16 (App Router) |
-| Language    | TypeScript                                  |
-| UI          | React 19, Tailwind CSS 4, Radix UI patterns |
-| Motion      | [Motion](https://motion.dev/) (formerly Framer Motion) |
-| Tooling     | ESLint, Prettier, pnpm                      |
+| Area      | Choice                                                 |
+| --------- | ------------------------------------------------------ |
+| Framework | [Next.js](https://nextjs.org/) 16 (App Router)         |
+| Language  | TypeScript                                             |
+| UI        | React 19, Tailwind CSS 4, Radix UI patterns            |
+| Motion    | [Motion](https://motion.dev/) (formerly Framer Motion) |
+| Tooling   | ESLint, Prettier, pnpm                                 |
 
 ---
 
 ## Requirements
 
-- **Node.js** 20 or newer  
-- **pnpm** 10 or newer  
+- **Node.js** 20 or newer
+- **pnpm** 10 or newer
 
 ---
 
@@ -65,13 +65,13 @@ pnpm start
 
 ## Scripts
 
-| Command        | Description                |
-| -------------- | -------------------------- |
-| `pnpm dev`     | Start the development server |
-| `pnpm build`   | Create an optimized production build |
-| `pnpm start`   | Run the production server  |
-| `pnpm lint`    | Run ESLint                 |
-| `pnpm format`  | Format the codebase with Prettier |
+| Command       | Description                          |
+| ------------- | ------------------------------------ |
+| `pnpm dev`    | Start the development server         |
+| `pnpm build`  | Create an optimized production build |
+| `pnpm start`  | Run the production server            |
+| `pnpm lint`   | Run ESLint                           |
+| `pnpm format` | Format the codebase with Prettier    |
 
 ---
 

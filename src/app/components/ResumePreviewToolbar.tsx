@@ -53,7 +53,7 @@ export function ResumePreviewToolbar({
         )}
       >
         <div className="flex min-w-0 flex-1 flex-col gap-3 sm:gap-2">
-          <p className="text-foreground text-sm font-semibold leading-snug">
+          <p className="text-foreground text-sm leading-snug font-semibold">
             {readOnly ? copy.headlineReadOnly : copy.headlineEdit}
           </p>
           <div

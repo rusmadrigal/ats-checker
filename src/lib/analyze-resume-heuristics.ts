@@ -1,10 +1,5 @@
 import type { AnalysisIssue, AnalysisResult, AnalysisSuggestion } from './analysis-types';
-
-const EMAIL_RE = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/;
-const PHONE_RE =
-  /(?:\+?\d{1,3}[\s.-]?)?(?:\(?\d{2,4}\)?[\s.-]?)?\d{2,4}[\s.-]?\d{2,4}[\s.-]?\d{2,6}/;
-const LINKEDIN_RE = /linkedin\.com\/in\/[\w-]+/i;
-const URL_RE = /https?:\/\/[^\s]+/i;
+import { EMAIL_RE, LINKEDIN_RE, PHONE_RE, URL_RE } from './contact-patterns';
 
 const SECTION_PATTERNS = {
   experience:
@@ -13,8 +8,7 @@ const SECTION_PATTERNS = {
   skills: /habilidades|competencias|skills|tecnolog[ií]as|stack/i,
 };
 
-const BULLET_LINE =
-  /^\s*(?:[•\-\*◦·]|\d{1,2}[\.)]|[a-z][\.)])\s+\S/m;
+const BULLET_LINE = /^\s*(?:[•\-\*◦·]|\d{1,2}[\.)]|[a-z][\.)])\s+\S/m;
 
 function clampScore(n: number): number {
   return Math.max(0, Math.min(100, Math.round(n)));
@@ -51,21 +45,33 @@ export function analyzeResumeText(raw: string): AnalysisResult {
   };
 
   if (text.length < 80) {
-    add('error', 'El texto extraído es demasiado corto o vacío; el ATS no podrá evaluarte bien.', 35);
+    add(
+      'error',
+      'El texto extraído es demasiado corto o vacío; el ATS no podrá evaluarte bien.',
+      35,
+    );
   }
 
   if (text.length > 80 && text.length < 400) {
-    add('warning', 'El currículum parece muy breve; añade más detalle en experiencia y logros.', 12);
+    add(
+      'warning',
+      'El currículum parece muy breve; añade más detalle en experiencia y logros.',
+      12,
+    );
   }
 
   if (!EMAIL_RE.test(text)) {
-    add('error', 'No se detectó un correo electrónico visible; muchos ATS y reclutadores lo exigen.', 18);
+    add(
+      'error',
+      'No se detectó un correo electrónico visible; muchos ATS lo exigen. Añade el tuyo en el encabezado (no podemos inventar datos personales).',
+      18,
+    );
   }
 
   if (!PHONE_RE.test(text) && !LINKEDIN_RE.test(text) && !URL_RE.test(text)) {
     add(
       'warning',
-      'No hay teléfono, LinkedIn ni web claramente identificables; añade al menos un canal de contacto directo.',
+      'No hay teléfono, LinkedIn ni web claramente identificables. Incluye al menos uno con tus datos reales en la vista previa; la IA no genera números, enlaces ni correos por ti.',
       8,
     );
   }
@@ -100,7 +106,9 @@ export function analyzeResumeText(raw: string): AnalysisResult {
   }
 
   const wordCount = text.split(/\s+/).filter(Boolean).length;
-  const digitTokens = text.match(/\d+(?:[.,]\d+)?(?:\s?(?:%|€|\$|usd|mxn|eur|k|m|años|meses|año|mes))?/gi);
+  const digitTokens = text.match(
+    /\d+(?:[.,]\d+)?(?:\s?(?:%|€|\$|usd|mxn|eur|k|m|años|meses|año|mes))?/gi,
+  );
   const metricCount = digitTokens?.length ?? 0;
   if (wordCount > 120 && metricCount < 3) {
     add(

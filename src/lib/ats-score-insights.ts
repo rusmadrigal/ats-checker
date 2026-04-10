@@ -25,14 +25,10 @@ export function deriveAtsInsights(score: number, issues: AnalysisIssue[]): AtsIn
     const text = issue.text.toLowerCase();
     const pen = issue.type === 'error' ? 11 : 6;
 
-    if (
-      /palabra|keyword|métric|cuantif|cifra|clave/i.test(text)
-    ) {
+    if (/palabra|keyword|métric|cuantif|cifra|clave/i.test(text)) {
       keywords -= pen;
     }
-    if (
-      /formato|mayúscul|tabular|columna|pdf|docx|tabla/i.test(text)
-    ) {
+    if (/formato|mayúscul|tabular|columna|pdf|docx|tabla/i.test(text)) {
       formatting -= pen;
     }
     if (/línea|bloque|lectura|largo|líneas/i.test(text)) {
