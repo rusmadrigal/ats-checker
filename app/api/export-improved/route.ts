@@ -2,7 +2,9 @@ import { NextResponse } from 'next/server';
 import { analyzeResumeText } from '@/src/lib/analyze-resume-heuristics';
 import { buildImprovedPdfBuffer } from '@/src/lib/build-improved-pdf';
 import { convertDocxBufferToPdf } from '@/src/lib/convert-docx-to-pdf';
+import { buildHarvardDocxFromStructured } from '@/src/lib/build-harvard-docx';
 import { renderCvTemplateDocx } from '@/src/lib/docx-template-render';
+import { structuredExportPayloadSchema } from '@/src/lib/cv-structured-types';
 import { AnalysisHttpError, extractResumeText } from '@/src/lib/extract-resume-text';
 import { AiImprovementError, improveCvTextWithAi } from '@/src/lib/improve-text-ai';
 import { mergeImprovedText } from '@/src/lib/merge-improved-text';
@@ -33,43 +35,94 @@ export async function POST(request: Request) {
     const format = formatRaw === 'pdf' ? 'pdf' : 'docx';
     const useAi = truthyForm(form.get('useAi'));
     const sector = parseSector(form.get('sector'));
-
-    if (!file || !(file instanceof File)) {
-      return NextResponse.json({ error: 'Falta el archivo en el campo "file".' }, { status: 400 });
-    }
-
-    const buffer = Buffer.from(await file.arrayBuffer());
-    const text = await extractResumeText(buffer, file.type);
-    const analysis = analyzeResumeText(text);
-
     const improvedTextOverride = form.get('improvedText');
+
     let improved: string;
-    if (typeof improvedTextOverride === 'string' && improvedTextOverride.trim().length > 40) {
-      improved = improvedTextOverride.trim();
-    } else if (useAi) {
-      improved = await improveCvTextWithAi({
-        extractedText: text,
-        issues: analysis.issues,
-        suggestions: analysis.suggestions,
-      });
+    let base: string;
+
+    if (file instanceof File) {
+      const buffer = Buffer.from(await file.arrayBuffer());
+      const text = await extractResumeText(buffer, file.type);
+      const analysis = analyzeResumeText(text);
+      base = safeFilenameBase(file.name);
+
+      if (typeof improvedTextOverride === 'string' && improvedTextOverride.trim().length > 40) {
+        improved = improvedTextOverride.trim();
+      } else if (useAi) {
+        improved = await improveCvTextWithAi({
+          extractedText: text,
+          issues: analysis.issues,
+          suggestions: analysis.suggestions,
+        });
+      } else {
+        improved = mergeImprovedText(text, analysis.suggestions);
+      }
     } else {
-      improved = mergeImprovedText(text, analysis.suggestions);
+      if (
+        !(typeof improvedTextOverride === 'string' && improvedTextOverride.trim().length > 40)
+      ) {
+        return NextResponse.json(
+          {
+            error:
+              'Falta el archivo o un texto de vista previa suficiente para exportar. Sube de nuevo el CV o abre la sesión con el mismo archivo.',
+          },
+          { status: 400 },
+        );
+      }
+      improved = improvedTextOverride.trim();
+      const hint = form.get('filenameHint');
+      base = safeFilenameBase(
+        typeof hint === 'string' && hint.trim().length > 0 ? hint : 'cv',
+      );
     }
 
     const presentation = getSectorPresentation(sector);
     const bodyLines = improved.split('\n');
 
-    const docxBuffer = await renderCvTemplateDocx(
-      {
-        docTitle: presentation.docTitle,
-        docNote: presentation.docNote,
-        sectorHint: presentation.sectorHint,
-        bodyLines,
-      },
-      sector,
-    );
-
-    const base = safeFilenameBase(file.name);
+    const structuredRaw = form.get('structuredExport');
+    let docxBuffer: Buffer;
+    if (typeof structuredRaw === 'string' && structuredRaw.trim().length > 2) {
+      try {
+        const parsedJson: unknown = JSON.parse(structuredRaw);
+        const parsed = structuredExportPayloadSchema.safeParse(parsedJson);
+        if (parsed.success) {
+          docxBuffer = await buildHarvardDocxFromStructured(
+            parsed.data.structured,
+            parsed.data.approvals,
+          );
+        } else {
+          docxBuffer = await renderCvTemplateDocx(
+            {
+              docTitle: presentation.docTitle,
+              docNote: presentation.docNote,
+              sectorHint: presentation.sectorHint,
+              bodyLines,
+            },
+            sector,
+          );
+        }
+      } catch {
+        docxBuffer = await renderCvTemplateDocx(
+          {
+            docTitle: presentation.docTitle,
+            docNote: presentation.docNote,
+            sectorHint: presentation.sectorHint,
+            bodyLines,
+          },
+          sector,
+        );
+      }
+    } else {
+      docxBuffer = await renderCvTemplateDocx(
+        {
+          docTitle: presentation.docTitle,
+          docNote: presentation.docNote,
+          sectorHint: presentation.sectorHint,
+          bodyLines,
+        },
+        sector,
+      );
+    }
 
     if (format === 'docx') {
       return new NextResponse(new Uint8Array(docxBuffer), {

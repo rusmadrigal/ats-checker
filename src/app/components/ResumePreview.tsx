@@ -62,7 +62,7 @@ export function ResumePreview({
       <div className="rounded-xl bg-stone-200/45 p-4 sm:p-5 dark:bg-stone-900/35">
         <div
           className={cn(
-            'mx-auto min-h-[1100px] w-full max-w-[800px] rounded-xl border border-stone-300/90 bg-white p-12 font-serif leading-relaxed shadow-xl print:bg-white print:shadow-none',
+            'resume-print mx-auto min-h-[1100px] w-full max-w-[794px] rounded-xl border border-stone-300/90 bg-white px-10 py-11 font-serif leading-relaxed shadow-xl sm:px-12 sm:py-12 print:bg-white print:shadow-none',
             'transition-all duration-300',
             highlightPulse && 'ring-primary/50 shadow-primary/5 ring-2 print:ring-0',
           )}

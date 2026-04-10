@@ -3,8 +3,8 @@ import { PDFDocument, StandardFonts, rgb } from 'pdf-lib';
 const PDF_PAGE_WIDTH = 595.28;
 const PDF_PAGE_HEIGHT = 841.89;
 const MARGIN = 50;
-const FONT_SIZE = 11;
-const LINE_HEIGHT = 14;
+const FONT_SIZE = 12;
+const LINE_HEIGHT = 16;
 
 /**
  * PDF de texto continuo (sin reproducción del diseño del CV original).

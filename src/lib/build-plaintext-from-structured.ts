@@ -14,18 +14,18 @@ export function buildPlaintextFromStructured(cv: CvStructured, approvals: CvAppr
 
   if (cv.header.name.trim()) lines.push(cv.header.name.trim());
   if (cv.header.title.trim()) lines.push(cv.header.title.trim());
-  const contact = [cv.header.location.trim(), cv.header.email.trim()].filter(Boolean).join(' · ');
+  const contact = [cv.header.location.trim(), cv.header.email.trim()].filter(Boolean).join(' | ');
   if (contact) lines.push(contact);
   lines.push('');
 
-  lines.push('PERFIL PROFESIONAL');
+  lines.push('SUMMARY');
   const summaryOn = approvals.summary !== false;
   const summaryBody = summaryOn ? cv.summary.improved : cv.summary.original;
   if (summaryBody.trim()) lines.push(summaryBody.trim());
   lines.push('');
 
   if (cv.experience.length > 0) {
-    lines.push('EXPERIENCIA PROFESIONAL');
+    lines.push('EXPERIENCE');
     cv.experience.forEach((exp, i) => {
       const head = [exp.company.trim(), exp.period.trim()].filter(Boolean).join(' — ');
       if (head) lines.push(head);
@@ -56,24 +56,24 @@ export function buildPlaintextFromStructured(cv: CvStructured, approvals: CvAppr
     if (approvals[`skill-added-${i}`] !== false && s.trim()) skillParts.push(s.trim());
   });
   if (skillParts.length > 0) {
-    lines.push('COMPETENCIAS');
-    lines.push(skillParts.join(', '));
+    lines.push('SKILLS');
+    skillParts.forEach((s) => lines.push(bulletLine(s)));
     lines.push('');
   }
 
   if (cv.education.length > 0) {
-    lines.push('FORMACIÓN');
+    lines.push('EDUCATION');
     cv.education.forEach((ed) => {
       const row = [ed.degree.trim(), ed.institution.trim(), ed.period.trim()]
         .filter(Boolean)
         .join(' · ');
-      if (row) lines.push(bulletLine(row));
+      if (row) lines.push(row);
     });
     lines.push('');
   }
 
   if (cv.languages.length > 0) {
-    lines.push('IDIOMAS');
+    lines.push('LANGUAGES');
     cv.languages.forEach((lang) => {
       if (lang.trim()) lines.push(bulletLine(lang.trim()));
     });

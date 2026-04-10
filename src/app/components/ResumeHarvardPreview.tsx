@@ -1,6 +1,5 @@
 'use client';
 
-import type { Ref } from 'react';
 import { motion } from 'motion/react';
 import { Plus, Sparkles, Trash2 } from 'lucide-react';
 import type { CvApprovalMap, CvStructured } from '@/src/lib/cv-structured-types';
@@ -46,8 +45,6 @@ type Props = {
   onAddSkillAdded: () => void;
   /** Resalta campos de contacto que el usuario debe completar (color --user-action-highlight). */
   contactHighlight?: ContactFieldHighlightFlags;
-  /** Nodo del CV (sin barra de herramientas) para exportar PDF fiel al diseño. */
-  documentExportRef?: Ref<HTMLDivElement>;
 };
 
 function ApprovalSwitch({
@@ -75,6 +72,143 @@ function ApprovalSwitch({
       >
         {label}
       </Label>
+    </div>
+  );
+}
+
+/** Vista solo lectura: plantilla Harvard ATS (PDF / coherencia con DOCX). */
+function HarvardAtsReadOnlyDocument({
+  data,
+  approvals,
+}: {
+  data: CvStructured;
+  approvals: CvApprovalMap;
+}) {
+  const summaryText =
+    approvals.summary === false && data.summary.original.trim()
+      ? data.summary.original
+      : data.summary.improved || data.summary.original;
+
+  const contact = [data.header.location, data.header.email].filter(Boolean).join(' | ');
+
+  const skillLines: string[] = [];
+  data.skills.improved.forEach((s, i) => {
+    const useImp = approvals[`skill-${i}`] !== false;
+    const raw = useImp ? s : (data.skills.original[i] ?? s);
+    if (raw.trim()) skillLines.push(raw.trim());
+  });
+  data.skills.added.forEach((s, i) => {
+    if (approvals[`skill-added-${i}`] !== false && s.trim()) skillLines.push(s.trim());
+  });
+
+  return (
+    <div className="resume-print harvard-body cv-export-document text-stone-900">
+      <header className="harvard-header page-break-avoid mb-0">
+        {data.header.name.trim() ? (
+          <h1 className="harvard-name font-serif text-stone-900">{data.header.name}</h1>
+        ) : null}
+        {data.header.title.trim() ? (
+          <p className="mt-1.5 font-serif text-[13px] leading-snug text-stone-900">
+            {data.header.title}
+          </p>
+        ) : null}
+        {contact ? (
+          <p className="mt-1.5 font-sans text-[12px] leading-normal text-stone-800">{contact}</p>
+        ) : null}
+        <div className="mt-4 border-b border-stone-900" aria-hidden />
+      </header>
+
+      {summaryText.trim() ? (
+        <section className="harvard-section mt-5">
+          <h2 className="harvard-section-title font-sans uppercase text-stone-900">SUMMARY</h2>
+          <p className="mt-3 font-serif text-[13px] leading-[1.55] whitespace-pre-wrap text-stone-900">
+            {summaryText}
+          </p>
+        </section>
+      ) : null}
+
+      {data.experience.length > 0 ? (
+        <section className="harvard-section mt-5">
+          <h2 className="harvard-section-title font-sans uppercase text-stone-900">EXPERIENCE</h2>
+          <div className="mt-3 space-y-0">
+            {data.experience.map((exp, i) => {
+              const head = [exp.company.trim(), exp.period.trim()].filter(Boolean).join(' — ');
+              return (
+                <article key={`h-exp-${i}`} className="harvard-job">
+                  {head ? (
+                    <p className="font-serif text-[13px] font-bold leading-snug text-stone-900">
+                      {head}
+                    </p>
+                  ) : null}
+                  {exp.title.trim() ? (
+                    <p className="mt-1 font-serif text-[13px] leading-snug text-stone-900">
+                      {exp.title}
+                    </p>
+                  ) : null}
+                  {exp.location.trim() ? (
+                    <p className="mt-1 font-sans text-[12px] leading-normal text-stone-800">
+                      {exp.location}
+                    </p>
+                  ) : null}
+                  <ul className="harvard-bullet-list mt-2.5 font-serif text-[13px] leading-[1.55] text-stone-900">
+                    {Array.from({
+                      length: Math.max(exp.original.length, exp.improved.length),
+                    }).map((_, j) => {
+                      const key = `exp-${i}-bullet-${j}`;
+                      const useImp = approvals[key] !== false;
+                      const orig = exp.original[j] ?? '';
+                      const imp = exp.improved[j] ?? '';
+                      const changed = orig.trim() !== imp.trim() && orig.trim().length > 0;
+                      const displayText =
+                        changed && !useImp ? orig || imp : useImp ? imp || orig : orig || imp;
+                      if (!displayText.trim()) return null;
+                      return <li key={key}>{displayText}</li>;
+                    })}
+                  </ul>
+                </article>
+              );
+            })}
+          </div>
+        </section>
+      ) : null}
+
+      {skillLines.length > 0 ? (
+        <section className="harvard-section mt-5">
+          <h2 className="harvard-section-title font-sans uppercase text-stone-900">SKILLS</h2>
+          <ul className="harvard-bullet-list mt-3 font-serif text-[13px] leading-[1.55] text-stone-900">
+            {skillLines.map((line, idx) => (
+              <li key={`sk-${idx}`}>{line}</li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
+
+      {data.education.length > 0 ? (
+        <section className="harvard-section mt-5">
+          <h2 className="harvard-section-title font-sans uppercase text-stone-900">EDUCATION</h2>
+          <ul className="mt-2 list-none space-y-2 p-0">
+            {data.education.map((ed, i) => (
+              <li
+                key={`h-edu-${i}`}
+                className="harvard-edu-block font-serif text-[13px] leading-[1.55] text-stone-900"
+              >
+                <span className="font-semibold">{ed.degree}</span>
+                {ed.institution ? <span>, {ed.institution}</span> : null}
+                {ed.period ? <span className="text-stone-800"> · {ed.period}</span> : null}
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
+
+      {data.languages.length > 0 ? (
+        <section className="harvard-section mt-5">
+          <h2 className="harvard-section-title font-sans uppercase text-stone-900">LANGUAGES</h2>
+          <p className="mt-3 font-serif text-[13px] leading-[1.55] text-stone-900">
+            {data.languages.filter(Boolean).join(' · ')}
+          </p>
+        </section>
+      ) : null}
     </div>
   );
 }
@@ -115,7 +249,6 @@ export function ResumeHarvardPreview({
   onAddSkillRow,
   onAddSkillAdded,
   contactHighlight,
-  documentExportRef,
 }: Props) {
   const t =
     language === 'en'
@@ -176,16 +309,16 @@ export function ResumeHarvardPreview({
           contact: 'Nombre y contacto',
           roleLine: 'Título profesional',
           readOnlyLabel: 'Vista Previa',
-          editLabel: 'Editar currículum',
+          editLabel: 'Editar CV',
           headlineReadOnly: 'Solo lectura: ves el currículum sin recuadros para escribir.',
           headlineEdit: 'Modo edición: puedes cambiar el texto en los recuadros.',
           subReadOnly:
-            'Para escribir correcciones o activar/desactivar sugerencias, elige «Editar currículum».',
+            'Para escribir correcciones o activar/desactivar sugerencias, elige «Editar CV».',
           subEdit:
             'Lo que cambies aquí (y lo que apruebes) es lo mismo que se descargará en Word y PDF.',
           restoreAll: 'Volver al texto de la IA',
           modeBannerReadOnly:
-            'Consejo: cuando quieras corregir algo, pulsa «Editar currículum». Entonces aparecerán recuadros y verás claro que puedes escribir.',
+            'Consejo: cuando quieras corregir algo, pulsa «Editar CV». Entonces aparecerán recuadros y verás claro que puedes escribir.',
           modeBannerEdit:
             'Consejo: pulsa «Vista Previa» para leer tranquilo sin cajas. Tus cambios siguen guardados para la descarga.',
           toastReadOnly: 'Vista Previa: solo lectura, sin campos de texto.',
@@ -294,7 +427,6 @@ export function ResumeHarvardPreview({
       ) : null}
 
       <motion.div
-        ref={documentExportRef}
         key={readOnly ? 'readonly' : 'editing'}
         initial={{ opacity: 0.88, scale: 0.995 }}
         animate={{ opacity: 1, scale: 1 }}
@@ -302,13 +434,19 @@ export function ResumeHarvardPreview({
         className="relative w-full overflow-visible transition-all duration-300 print:shadow-none"
         style={{ fontFamily: 'Georgia, "Times New Roman", serif' }}
       >
-        <div
-          className="absolute top-0 right-0 left-0 h-1 rounded-t-sm"
-          style={{ backgroundColor: accent }}
-          aria-hidden
-        />
+        {!readOnly ? (
+          <div
+            className="absolute top-0 right-0 left-0 h-1 rounded-t-sm"
+            style={{ backgroundColor: accent }}
+            aria-hidden
+          />
+        ) : null}
 
         <div className="pt-2 pb-4 sm:pt-3 sm:pb-6">
+          {readOnly ? (
+            <HarvardAtsReadOnlyDocument data={data} approvals={approvals} />
+          ) : (
+            <>
           <div className="mb-2 flex flex-wrap items-start justify-between gap-4">
             <div className="min-w-0 flex-1 space-y-3">
               <div className="flex flex-wrap items-center justify-between gap-2">
@@ -934,6 +1072,8 @@ export function ResumeHarvardPreview({
                 />
               )}
             </section>
+          )}
+            </>
           )}
         </div>
       </motion.div>

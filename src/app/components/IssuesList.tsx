@@ -30,7 +30,7 @@ export function IssuesList({ issues, title, footer }: IssuesListProps) {
       <div className="space-y-4">
         {issues.map((issue, index) => (
           <motion.div
-            key={index}
+            key={`${issue.type}-${issue.text.slice(0, 96)}-${index}`}
             initial={{ opacity: 0, x: -20 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ duration: 0.4, delay: 0.4 + index * 0.1 }}

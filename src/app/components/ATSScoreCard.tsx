@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import { motion } from 'motion/react';
 import { BookOpen, Briefcase, Hash, LayoutList, Loader2 } from 'lucide-react';
 import { ScoreCircle } from './ScoreCircle';
@@ -75,6 +76,17 @@ export function ATSScoreCard({
   improvementHintsTitle = 'Mejoras detectadas',
 }: ATSScoreCardProps) {
   const showDelta = scoreDelta !== null && scoreDelta !== 0;
+  const [scoreFlash, setScoreFlash] = useState<'up' | 'down' | null>(null);
+
+  useEffect(() => {
+    if (scoreDelta === null || scoreDelta === 0) {
+      setScoreFlash(null);
+      return;
+    }
+    setScoreFlash(scoreDelta > 0 ? 'up' : 'down');
+    const t = window.setTimeout(() => setScoreFlash(null), 1100);
+    return () => window.clearTimeout(t);
+  }, [scoreDelta]);
 
   return (
     <motion.div
@@ -102,7 +114,7 @@ export function ATSScoreCard({
             {labels.title}
           </p>
           <div className="flex flex-wrap items-center justify-center gap-2 lg:justify-start">
-            <ScoreCircle score={score} size="lg" />
+            <ScoreCircle score={score} size="lg" scoreFlash={scoreFlash} />
             {showDelta ? (
               <span
                 className={cn(

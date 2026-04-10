@@ -10,6 +10,8 @@ type ScoreCircleProps = {
   className?: string;
   /** Classes for the numeric score (e.g. transition). */
   scoreNumberClassName?: string;
+  /** Pulso de color tras cambio de puntuación (ATS en vivo). */
+  scoreFlash?: 'up' | 'down' | null;
 };
 
 export function ScoreCircle({
@@ -18,6 +20,7 @@ export function ScoreCircle({
   size = 'lg',
   className,
   scoreNumberClassName,
+  scoreFlash = null,
 }: ScoreCircleProps) {
   const r = size === 'lg' ? 52 : 42;
   const stroke = size === 'lg' ? 8 : 7;
@@ -47,7 +50,13 @@ export function ScoreCircle({
           strokeLinecap="round"
           stroke="currentColor"
           className={cn(
-            good ? 'text-emerald-500' : 'text-amber-500',
+            scoreFlash === 'down'
+              ? 'text-red-500'
+              : scoreFlash === 'up'
+                ? 'text-emerald-500'
+                : good
+                  ? 'text-emerald-500'
+                  : 'text-amber-500',
             'transition-all duration-500',
           )}
           initial={{ strokeDashoffset: c }}
@@ -60,6 +69,8 @@ export function ScoreCircle({
         <span
           className={cn(
             'text-foreground text-3xl font-semibold tracking-tight tabular-nums transition-all duration-500 sm:text-4xl',
+            scoreFlash === 'down' && 'text-red-600',
+            scoreFlash === 'up' && 'text-emerald-600',
             scoreNumberClassName,
           )}
         >

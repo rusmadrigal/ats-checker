@@ -2,8 +2,8 @@
 
 :root {
   --font-size: 17px;
-  /** Resaltado: datos que el usuario debe completar (la IA no genera). */
-  --user-action-highlight: lab(98.6252% -0.635922 8.42309);
+  /** Resaltado: datos que el usuario debe completar (la IA no genera). Hex (#fffbeb) por compatibilidad con captura PDF. */
+  --user-action-highlight: #fffbeb;
   --background: #f7f8fa;
   --foreground: #0f172a;
   --card: #ffffff;
@@ -135,6 +135,97 @@
   .contact-field-user-action {
     box-shadow: 0 0 0 2px var(--user-action-highlight);
     border-radius: calc(var(--radius) - 2px);
+  }
+
+  /**
+   * Vista previa / impresión: ancho A4 (~794px), tipografía Harvard ATS, sin columnas.
+   */
+  .resume-print {
+    width: 100%;
+    max-width: 794px;
+    margin-left: auto;
+    margin-right: auto;
+    background: #ffffff;
+    box-sizing: border-box;
+  }
+
+  .harvard-body {
+    font-size: 13px;
+    line-height: 1.55;
+  }
+
+  .harvard-name {
+    font-size: 28px;
+    font-weight: 700;
+    line-height: 1.15;
+    letter-spacing: -0.01em;
+  }
+
+  .harvard-section-title {
+    font-size: 16px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    line-height: 1.35;
+  }
+
+  .harvard-section {
+    margin-bottom: 22px;
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+
+  .harvard-job {
+    margin-bottom: 16px;
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+
+  .harvard-edu-block {
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+
+  .page-break-avoid {
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+
+  .harvard-bullet-list {
+    list-style-type: disc;
+    margin-left: 1.25rem;
+    padding-left: 0;
+  }
+
+  .harvard-bullet-list li {
+    margin-top: 0.125rem;
+    margin-bottom: 0.125rem;
+  }
+
+  /**
+   * Tipografía coherente para export (Harvard ATS): cuerpo serif, títulos sans.
+   */
+  .cv-export-document {
+    font-family: Georgia, 'Times New Roman', Times, serif;
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .cv-export-document .harvard-section-title {
+    font-family: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue',
+      Arial, sans-serif;
+    font-feature-settings: 'kern' 1;
+  }
+
+  .cv-export-document .harvard-contact,
+  .cv-export-document .font-sans {
+    font-family: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue',
+      Arial, sans-serif;
+  }
+
+  /** Viñetas: evitar cortes feos en impresión / flujo de página. */
+  .cv-export-document .harvard-bullet-list li {
+    page-break-inside: avoid;
+    break-inside: avoid;
   }
 }
 

@@ -14,7 +14,6 @@ import {
   Trash2,
   ChevronDown,
   Sparkles,
-  RefreshCw,
 } from 'lucide-react';
 import { Toaster, toast } from 'sonner';
 import { PreviewLoadingOverlay } from './components/PreviewLoadingOverlay';
@@ -46,8 +45,8 @@ import { analyzeResumeText } from '@/src/lib/analyze-resume-heuristics';
 import { hasSecondaryContactChannel } from '@/src/lib/contact-patterns';
 import type { AnalysisIssue, AnalysisResult } from '@/src/lib/analysis-types';
 import { buildPlaintextFromStructured } from '@/src/lib/build-plaintext-from-structured';
-import { exportResumeHtmlToPdf } from '@/src/lib/export-resume-html-to-pdf';
 import { buildSectionsOutline } from '@/src/lib/build-sections-outline';
+import { classifyAtsIssueSeverity } from '@/src/lib/classify-ats-issue';
 import type { AiRescoreResult } from '@/src/lib/re-score-resume-ai';
 import type { CvApprovalMap, CvStructured } from '@/src/lib/cv-structured-types';
 import {
@@ -144,6 +143,8 @@ const translations = {
     downloadPdf: 'Descargar PDF',
     exportLoading: 'Generando…',
     exportSuccess: 'Descarga lista',
+    pdfFallbackLayout:
+      'PDF en texto continuo. Para el mismo diseño que la vista previa, configura GOTENBERG_URL o LIBREOFFICE_PATH en el servidor (ver .env.example).',
     previewTitle: 'Vista previa de tu currículum',
     previewDescription:
       'Tras subir el archivo, la vista previa con IA se genera sola. Si vuelves a subir el mismo fichero, se recupera la guardada (sin gastar tokens). Puedes quitar la vista previa con el botón o al subir otro CV.',
@@ -199,8 +200,6 @@ const translations = {
     fixIssuesConfirmListLabel: 'Se tendrán en cuenta estos puntos:',
     fixIssuesConfirmApply: 'Sí, aplicar correcciones',
     fixIssuesConfirmCancel: 'Cancelar',
-    refreshIssuesList: 'Actualizar lista de problemas',
-    refreshIssuesListToast: 'Lista de problemas actualizada según tu vista previa actual.',
   },
 } as const;
 
@@ -219,11 +218,6 @@ function safeExportBasename(name: string | null | undefined): string {
     .replace(/_+/g, '_')
     .replace(/^_|_$/g, '');
   return ascii.slice(0, 80) || 'cv';
-}
-
-function issuesFromCvStructured(cv: CvStructured, appr: CvApprovalMap): AnalysisIssue[] {
-  const text = buildPlaintextFromStructured(cv, appr);
-  return analyzeResumeText(text).issues;
 }
 
 export default function App() {
@@ -252,16 +246,14 @@ export default function App() {
   const [aiLivePending, setAiLivePending] = useState(false);
   const [fixIssuesLoading, setFixIssuesLoading] = useState(false);
   const [fixIssuesConfirmOpen, setFixIssuesConfirmOpen] = useState(false);
-  /**
-   * Con vista previa: incidencias congeladas en un análisis local (no las de re-score IA),
-   * para que la lista no cambie a cada pulsación. Se renueva al generar vista previa, al
-   * corregir con IA o al pulsar «Actualizar lista de problemas».
-   */
-  const [pinnedIssues, setPinnedIssues] = useState<AnalysisIssue[] | null>(null);
   const aiRescoreRequestId = useRef(0);
   const lastAiScoreRef = useRef<number | null>(null);
   const aiFetchAbortRef = useRef<AbortController | null>(null);
-  const resumeDocumentExportRef = useRef<HTMLDivElement | null>(null);
+  /** Huella estable del CV en vista previa para re-evaluar ATS solo cuando cambia el contenido. */
+  const atsResumeStateKey = useMemo(
+    () => (structuredPreview ? JSON.stringify({ cv: structuredPreview, approvals }) : ''),
+    [structuredPreview, approvals],
+  );
 
   /** Puntuación e incidencias alineadas con el texto que exportarías (vista previa + aprobaciones). */
   const effectiveAnalysis = useMemo((): AnalysisResult | null => {
@@ -272,10 +264,23 @@ export default function App() {
   }, [analysis, structuredPreview, approvals]);
 
   const displayIssues = useMemo((): AnalysisIssue[] => {
-    if (structuredPreview !== null && pinnedIssues !== null) return pinnedIssues;
     if (!effectiveAnalysis) return [];
+    if (structuredPreview && aiLive) {
+      const merged: AnalysisIssue[] = [];
+      for (const raw of aiLive.issues) {
+        const text = raw.trim();
+        if (!text) continue;
+        merged.push({ type: classifyAtsIssueSeverity(text), text });
+      }
+      for (const raw of aiLive.warnings ?? []) {
+        const text = raw.trim();
+        if (!text) continue;
+        merged.push({ type: 'warning', text });
+      }
+      if (merged.length > 0) return merged;
+    }
     return effectiveAnalysis.issues;
-  }, [structuredPreview, pinnedIssues, effectiveAnalysis]);
+  }, [structuredPreview, aiLive, effectiveAnalysis]);
 
   const displayScore = aiLive && structuredPreview ? aiLive.score : (effectiveAnalysis?.score ?? 0);
 
@@ -338,12 +343,12 @@ export default function App() {
       return;
     }
 
-    const text = buildPlaintextFromStructured(structuredPreview, approvals).trim();
-    if (text.length < 40) {
-      aiFetchAbortRef.current?.abort();
-      aiFetchAbortRef.current = null;
-      return;
-    }
+    const textRaw = buildPlaintextFromStructured(structuredPreview, approvals).trim();
+    const outline = buildSectionsOutline(structuredPreview);
+    const resumeText =
+      textRaw.length >= 8
+        ? textRaw
+        : `[Evaluación ATS — contenido mínimo o casi vacío]\n${textRaw || '(sin texto exportable)'}\n\nEstructura (JSON):\n${outline}`;
 
     const debounce = window.setTimeout(() => {
       aiFetchAbortRef.current?.abort();
@@ -361,9 +366,9 @@ export default function App() {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-              resumeText: text,
+              resumeText: resumeText.slice(0, 28000),
               previousScore: Math.round(previousScore),
-              sectionsOutline: buildSectionsOutline(structuredPreview),
+              sectionsOutline: outline,
             }),
             signal: ac.signal,
           });
@@ -386,6 +391,8 @@ export default function App() {
             formatting: typeof r.formatting === 'number' ? r.formatting : r.score,
             experience: typeof r.experience === 'number' ? r.experience : r.score,
             issues: Array.isArray(r.issues) ? r.issues : [],
+            warnings: Array.isArray(r.warnings) ? r.warnings : [],
+            strengths: Array.isArray(r.strengths) ? r.strengths : [],
             improvements: Array.isArray(r.improvements) ? r.improvements : [],
           });
           lastAiScoreRef.current = r.score;
@@ -399,7 +406,7 @@ export default function App() {
           }
         }
       })();
-    }, 500);
+    }, 400);
 
     return () => {
       window.clearTimeout(debounce);
@@ -407,7 +414,7 @@ export default function App() {
       aiFetchAbortRef.current = null;
       setAiLivePending(false);
     };
-  }, [structuredPreview, approvals, analysis]);
+  }, [atsResumeStateKey, analysis]);
 
   // const [language, setLanguage] = useState<Language>('en');
   // const t = translations[language];
@@ -424,7 +431,6 @@ export default function App() {
     setStructuredPreview(p.structured);
     setStructuredBaseline(cloneCvStructured(p.baseline));
     setApprovals(p.approvals);
-    setPinnedIssues(issuesFromCvStructured(p.structured, p.approvals));
     setAiLive(null);
     lastAiScoreRef.current = null;
     setPreviewReadOnly(p.previewReadOnly);
@@ -475,7 +481,6 @@ export default function App() {
     setStructuredPreview(null);
     setStructuredBaseline(null);
     setApprovals({});
-    setPinnedIssues(null);
     setPreviewReadOnly(false);
     setPersistFileKey(null);
     setPersistFileName(null);
@@ -503,7 +508,6 @@ export default function App() {
       setStructuredPreview(null);
       setStructuredBaseline(null);
       setApprovals({});
-      setPinnedIssues(null);
       setPreviewReadOnly(false);
       setPersistFileKey(null);
       setPersistFileName(null);
@@ -541,7 +545,6 @@ export default function App() {
         setStructuredPreview(storedBefore.structured);
         setStructuredBaseline(cloneCvStructured(storedBefore.baseline));
         setApprovals(storedBefore.approvals);
-        setPinnedIssues(issuesFromCvStructured(storedBefore.structured, storedBefore.approvals));
         setPreviewReadOnly(storedBefore.previewReadOnly);
         toast(t.previewRecoveredNoTokens, { duration: 3000 });
       } else {
@@ -584,7 +587,6 @@ export default function App() {
       setStructuredBaseline(cloneCvStructured(structured));
       setPreviewReadOnly(true);
       setApprovals(appr);
-      setPinnedIssues(issuesFromCvStructured(structured, appr));
       setPersistFileKey(fileKeyFromFile(file));
       setPersistFileName(file.name);
       toast.success(replaceExisting ? 'Vista previa actualizada.' : 'Vista previa lista.');
@@ -658,7 +660,6 @@ export default function App() {
       const appr = defaultApprovalsForCv(next);
       setStructuredPreview(next);
       setApprovals(appr);
-      setPinnedIssues(issuesFromCvStructured(next, appr));
       setAiLive(null);
       aiRescoreRequestId.current += 1;
       toast.success(t.fixIssuesSuccess);
@@ -870,38 +871,29 @@ export default function App() {
     toast('Formación restaurada.', { duration: 2200 });
   };
 
+  const canDownloadExport = uploadedFile !== null || structuredPreview !== null;
+
   const downloadImproved = async (format: 'docx' | 'pdf') => {
-    if (!uploadedFile) {
+    if (!uploadedFile && !structuredPreview) {
       toast.error(t.downloadNeedsFile);
       return;
     }
     setExportingFormat(format);
     try {
-      if (format === 'pdf' && structuredPreview) {
-        const el = resumeDocumentExportRef.current;
-        if (!el) {
-          throw new Error('La vista previa aún no está lista para exportar.');
-        }
-        const prevReadOnly = previewReadOnly;
-        setPreviewReadOnly(true);
-        await new Promise<void>((resolve) => {
-          requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
-        });
-        try {
-          const base = safeExportBasename(persistFileName ?? uploadedFile.name);
-          await exportResumeHtmlToPdf(el, `${base}_mejorado.pdf`);
-          toast.success(t.exportSuccess);
-        } finally {
-          if (!prevReadOnly) setPreviewReadOnly(false);
-        }
-        return;
-      }
-
       const body = new FormData();
-      body.append('file', uploadedFile);
+      if (uploadedFile) {
+        body.append('file', uploadedFile);
+      }
       body.append('format', format);
       if (structuredPreview) {
         body.append('improvedText', buildPlaintextFromStructured(structuredPreview, approvals));
+        body.append(
+          'structuredExport',
+          JSON.stringify({ structured: structuredPreview, approvals }),
+        );
+      }
+      if (!uploadedFile && persistFileName) {
+        body.append('filenameHint', persistFileName);
       }
       body.append('useAi', 'false');
       const res = await fetch('/api/export-improved', { method: 'POST', body });
@@ -925,6 +917,9 @@ export default function App() {
       a.click();
       URL.revokeObjectURL(url);
       toast.success(t.exportSuccess);
+      if (format === 'pdf' && res.headers.get('X-Ats-Pdf-Source') === 'plaintext-fallback') {
+        toast.message(t.pdfFallbackLayout, { duration: 7000 });
+      }
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Error al exportar.');
     } finally {
@@ -1036,6 +1031,11 @@ export default function App() {
                           applied: t.improvementApplied,
                         }}
                         onApplyCopy={copySuggestionText}
+                        liveAiTips={
+                          structuredPreview && aiLive
+                            ? [...aiLive.strengths, ...aiLive.improvements].filter(Boolean)
+                            : undefined
+                        }
                       />
                       {effectiveAnalysis && displayIssues.length === 0 ? (
                         <motion.div
@@ -1061,34 +1061,15 @@ export default function App() {
                             title={t.issuesTitle}
                             footer={
                               structuredPreview ? (
-                                <div className="space-y-3">
-                                  <Button
-                                    type="button"
-                                    variant="outline"
-                                    className="w-full gap-2 border-dashed font-sans text-xs font-medium"
-                                    disabled={
-                                      previewLoading || fixIssuesLoading || exportingFormat !== null
-                                    }
-                                    onClick={() => {
-                                      setPinnedIssues(
-                                        issuesFromCvStructured(structuredPreview, approvals),
-                                      );
-                                      toast.success(t.refreshIssuesListToast);
-                                    }}
-                                  >
-                                    <RefreshCw className="size-3.5 shrink-0" aria-hidden />
-                                    {t.refreshIssuesList}
-                                  </Button>
-                                  <IssuesListFixWithAiButton
-                                    label={t.fixIssuesWithAi}
-                                    loadingLabel={t.fixIssuesLoading}
-                                    onClick={() => setFixIssuesConfirmOpen(true)}
-                                    disabled={
-                                      previewLoading || fixIssuesLoading || exportingFormat !== null
-                                    }
-                                    loading={false}
-                                  />
-                                </div>
+                                <IssuesListFixWithAiButton
+                                  label={t.fixIssuesWithAi}
+                                  loadingLabel={t.fixIssuesLoading}
+                                  onClick={() => setFixIssuesConfirmOpen(true)}
+                                  disabled={
+                                    previewLoading || fixIssuesLoading || exportingFormat !== null
+                                  }
+                                  loading={false}
+                                />
                               ) : null
                             }
                           />
@@ -1170,11 +1151,14 @@ export default function App() {
                             metrics={displayMetrics}
                             scoreDelta={structuredPreview && aiLive ? aiLive.delta : null}
                             isUpdating={Boolean(structuredPreview && aiLivePending)}
-                            improvementHints={
-                              structuredPreview && aiLive && aiLive.improvements.length > 0
-                                ? aiLive.improvements
-                                : undefined
-                            }
+                            improvementHints={(() => {
+                              if (!structuredPreview || !aiLive) return undefined;
+                              const h = [...aiLive.strengths, ...aiLive.improvements]
+                                .map((s) => s.trim())
+                                .filter(Boolean)
+                                .slice(0, 8);
+                              return h.length > 0 ? h : undefined;
+                            })()}
                             labels={{
                               title: t.insightsTitle,
                               readability: t.insightsReadability,
@@ -1210,9 +1194,13 @@ export default function App() {
                           ) : null}
                           <motion.button
                             type="button"
-                            disabled={exportingFormat !== null || !uploadedFile}
-                            whileHover={{ scale: exportingFormat || !uploadedFile ? 1 : 1.02 }}
-                            whileTap={{ scale: exportingFormat || !uploadedFile ? 1 : 0.98 }}
+                            disabled={exportingFormat !== null || !canDownloadExport}
+                            whileHover={{
+                              scale: exportingFormat || !canDownloadExport ? 1 : 1.02,
+                            }}
+                            whileTap={{
+                              scale: exportingFormat || !canDownloadExport ? 1 : 0.98,
+                            }}
                             onClick={() => downloadImproved('pdf')}
                             className="bg-primary text-primary-foreground focus-visible:ring-primary inline-flex min-h-9 items-center gap-1.5 rounded-lg px-3.5 text-xs font-semibold shadow-sm focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none disabled:opacity-50"
                           >
@@ -1225,9 +1213,13 @@ export default function App() {
                           </motion.button>
                           <motion.button
                             type="button"
-                            disabled={exportingFormat !== null || !uploadedFile}
-                            whileHover={{ scale: exportingFormat || !uploadedFile ? 1 : 1.02 }}
-                            whileTap={{ scale: exportingFormat || !uploadedFile ? 1 : 0.98 }}
+                            disabled={exportingFormat !== null || !canDownloadExport}
+                            whileHover={{
+                              scale: exportingFormat || !canDownloadExport ? 1 : 1.02,
+                            }}
+                            whileTap={{
+                              scale: exportingFormat || !canDownloadExport ? 1 : 0.98,
+                            }}
                             onClick={() => downloadImproved('docx')}
                             className="border-border bg-background hover:bg-muted focus-visible:ring-primary inline-flex min-h-9 items-center gap-1.5 rounded-lg border px-3.5 text-xs font-semibold focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none disabled:opacity-50"
                           >
@@ -1361,7 +1353,6 @@ export default function App() {
                             onDeleteSkillRow={handleDeleteSkillRow}
                             onDeleteSkillAdded={handleDeleteSkillAdded}
                             onDeleteEducation={handleDeleteEducation}
-                            documentExportRef={resumeDocumentExportRef}
                             onAddExperience={handleAddExperience}
                             onAddExpBullet={handleAddExpBullet}
                             onAddEducation={handleAddEducation}

@@ -5,7 +5,7 @@ import { AiRescoreError, rescoreResumeWithAi } from '@/src/lib/re-score-resume-a
 export const runtime = 'nodejs';
 
 const bodySchema = z.object({
-  resumeText: z.string().min(20).max(28000),
+  resumeText: z.string().min(8).max(28000),
   previousScore: z.number().int().min(0).max(100).optional(),
   sectionsOutline: z.string().max(4000).optional(),
 });
@@ -16,7 +16,7 @@ export async function POST(request: Request) {
     const parsed = bodySchema.safeParse(json);
     if (!parsed.success) {
       return NextResponse.json(
-        { error: 'Cuerpo inválido: resumeText requerido (20–28000 caracteres).' },
+        { error: 'Cuerpo inválido: resumeText requerido (8–28000 caracteres).' },
         { status: 400 },
       );
     }

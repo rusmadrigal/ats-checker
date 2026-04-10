@@ -39,6 +39,9 @@ type AISuggestionsPanelProps = {
     applied: string;
   };
   onApplyCopy: (text: string) => void;
+  /** Consejos breves de la IA según la vista previa actual (ATS en vivo). */
+  liveAiTips?: string[];
+  liveAiTitle?: string;
 };
 
 export function AISuggestionsPanel({
@@ -46,9 +49,12 @@ export function AISuggestionsPanel({
   title,
   labels,
   onApplyCopy,
+  liveAiTips = [],
+  liveAiTitle = 'Actualización en vivo (ATS)',
 }: AISuggestionsPanelProps) {
   const items = buildItems(suggestions);
-  if (items.length === 0) return null;
+  const tips = liveAiTips.map((s) => s.trim()).filter(Boolean);
+  if (items.length === 0 && tips.length === 0) return null;
 
   return (
     <div className="flex min-h-0 min-w-0 flex-col gap-4">
@@ -62,16 +68,50 @@ export function AISuggestionsPanel({
         </span>
         <h3 className="text-foreground text-sm font-semibold tracking-tight">{title}</h3>
       </motion.div>
-      <div className="flex flex-col gap-4">
-        {items.map((item) => (
-          <ImprovementCard
-            key={item.id}
-            item={item}
-            labels={labels}
-            onApply={() => onApplyCopy(item.after)}
-          />
-        ))}
-      </div>
+      {items.length > 0 ? (
+        <div className="flex flex-col gap-4">
+          {items.map((item) => (
+            <ImprovementCard
+              key={item.id}
+              item={item}
+              labels={labels}
+              onApply={() => onApplyCopy(item.after)}
+            />
+          ))}
+        </div>
+      ) : null}
+      {tips.length > 0 ? (
+        <motion.div
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.35 }}
+          className="border-border/70 bg-muted/20 rounded-xl border px-4 py-3"
+        >
+          <p className="text-muted-foreground mb-2 text-[10px] font-semibold tracking-wide uppercase">
+            {liveAiTitle}
+          </p>
+          <ul className="space-y-2">
+            {tips.map((line, i) => (
+              <li
+                key={`${i}-${line.slice(0, 48)}`}
+                className="text-foreground flex gap-2 text-xs leading-relaxed"
+              >
+                <span className="text-emerald-600 mt-0.5 shrink-0 font-bold" aria-hidden>
+                  •
+                </span>
+                <span className="min-w-0 flex-1">{line}</span>
+                <button
+                  type="button"
+                  onClick={() => onApplyCopy(line)}
+                  className="text-primary hover:text-primary/80 shrink-0 text-[10px] font-semibold underline-offset-2 hover:underline"
+                >
+                  {labels.apply}
+                </button>
+              </li>
+            ))}
+          </ul>
+        </motion.div>
+      ) : null}
     </div>
   );
 }

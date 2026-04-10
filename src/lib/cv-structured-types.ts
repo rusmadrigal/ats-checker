@@ -61,6 +61,14 @@ export const cvStructuredSchema = z.object({
 
 export type CvStructured = z.infer<typeof cvStructuredSchema>;
 
+/** Cuerpo JSON opcional del cliente para export DOCX Harvard estructurado. */
+export const structuredExportPayloadSchema = z.object({
+  structured: cvStructuredSchema,
+  approvals: z.record(z.string(), z.boolean()),
+});
+
+export type StructuredExportPayload = z.infer<typeof structuredExportPayloadSchema>;
+
 export type CvExperienceEntry = CvStructured['experience'][number];
 export type CvEducationEntry = CvStructured['education'][number];
 
