@@ -77,6 +77,16 @@ export function buildPlaintextFromStructured(cv: CvStructured, approvals: CvAppr
     cv.languages.forEach((lang) => {
       if (lang.trim()) lines.push(bulletLine(lang.trim()));
     });
+    lines.push('');
+  }
+
+  for (const sec of cv.extraSections ?? []) {
+    const t = sec.title.trim();
+    const c = sec.content.trim();
+    if (!t && !c) continue;
+    if (t) lines.push(t.toUpperCase());
+    if (c) lines.push(c);
+    lines.push('');
   }
 
   return lines

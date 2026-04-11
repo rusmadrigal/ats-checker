@@ -1,13 +1,13 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
-import { cvStructuredSchema } from '@/src/lib/cv-structured-types';
+import { cvStructuredInputSchema } from '@/src/lib/cv-structured-types';
 import { fixCvIssuesWithAi } from '@/src/lib/fix-cv-issues-ai';
 import { AiImprovementError } from '@/src/lib/improve-text-ai';
 
 export const runtime = 'nodejs';
 
 const bodySchema = z.object({
-  structured: cvStructuredSchema,
+  structured: cvStructuredInputSchema,
   issues: z.array(z.string()).min(1).max(40),
 });
 

@@ -1,0 +1,27 @@
+# ATS CV Checker
+
+> Herramienta gratuita en español para analizar tu currículum con IA: detecta problemas de compatibilidad ATS, sugiere mejoras y exporta un CV en formato Harvard profesional (Word y PDF).
+
+## Páginas principales
+
+- [Inicio / herramienta](https://www.rusmadrigal.com/es): Sube un PDF o DOCX, recibe puntuación ATS, lista de incidencias, vista previa mejorada con IA y descarga del documento optimizado.
+
+## Legal y transparencia
+
+- [Política de privacidad](https://www.rusmadrigal.com/privacidad): Tratamiento de datos personales al usar el analizador.
+- [Política de cookies](https://www.rusmadrigal.com/cookies): Uso de cookies y preferencias en el sitio.
+- [Aviso legal](https://www.rusmadrigal.com/aviso-legal): Titular del sitio e información legal.
+
+## Autor y contacto del proyecto
+
+- [Rus Madrigal — sitio profesional](https://www.rusmadrigal.com/es): Creador del proyecto; SEO técnico y growth.
+
+## Recursos técnicos (máquinas)
+
+- [Sitemap XML](https://www.rusmadrigal.com/sitemap.xml): URLs públicas indexables.
+- [Robots.txt](https://www.rusmadrigal.com/robots.txt): Reglas de rastreo (API excluida de indexación genérica).
+
+## Optional
+
+- Las rutas `/api/*` son solo para el funcionamiento de la aplicación (análisis, vista previa con IA, exportación); no están pensadas como documentación humana.
+- El idioma principal de la interfaz y de las respuestas orientadas al usuario es el español.

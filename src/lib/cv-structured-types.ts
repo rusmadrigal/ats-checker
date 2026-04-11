@@ -48,6 +48,16 @@ export const cvAtsSchema = z.object({
   improvements: z.array(z.string()),
 });
 
+/** Secciones del CV que no encajan en el bloque estándar (REFERENCES, HOBBIES, etc.) — no deben borrarse por la IA. */
+export const cvExtraSectionSchema = z.object({
+  title: z.string().describe('Encabezado tal como en el CV, p. ej. REFERENCES, HOBBIES'),
+  content: z
+    .string()
+    .describe(
+      'Texto completo del bloque (multilínea permitida). Mismo idioma que el CV; conservar sustancia.',
+    ),
+});
+
 export const cvStructuredSchema = z.object({
   meta: cvStructuredMetaSchema,
   header: cvHeaderSchema,
@@ -56,14 +66,26 @@ export const cvStructuredSchema = z.object({
   skills: cvSkillsSchema,
   education: z.array(cvEducationSchema),
   languages: z.array(z.string()),
+  /** Secciones extra preservadas (REFERENCES, HOBBIES, etc.). Sin `.default`: OpenAI exige `required` = todas las `properties`. */
+  extraSections: z.array(cvExtraSectionSchema),
   ats: cvAtsSchema,
 });
 
 export type CvStructured = z.infer<typeof cvStructuredSchema>;
 
+/** Normaliza JSON entrante sin `extraSections` (sesiones / clientes antiguos). */
+export function preprocessCvStructuredJson(val: unknown): unknown {
+  if (typeof val !== 'object' || val === null) return val;
+  const o = val as Record<string, unknown>;
+  return { ...o, extraSections: Array.isArray(o.extraSections) ? o.extraSections : [] };
+}
+
+/** CV estructurado tras tolerar ausencia de `extraSections` en el JSON. */
+export const cvStructuredInputSchema = z.preprocess(preprocessCvStructuredJson, cvStructuredSchema);
+
 /** Cuerpo JSON opcional del cliente para export DOCX Harvard estructurado. */
 export const structuredExportPayloadSchema = z.object({
-  structured: cvStructuredSchema,
+  structured: cvStructuredInputSchema,
   approvals: z.record(z.string(), z.boolean()),
 });
 
@@ -71,6 +93,12 @@ export type StructuredExportPayload = z.infer<typeof structuredExportPayloadSche
 
 export type CvExperienceEntry = CvStructured['experience'][number];
 export type CvEducationEntry = CvStructured['education'][number];
+export type CvExtraSection = z.infer<typeof cvExtraSectionSchema>;
+
+/** Asegura `extraSections` en CV guardados antes de existir el campo. */
+export function coerceStructuredCv(cv: CvStructured): CvStructured {
+  return { ...cv, extraSections: cv.extraSections ?? [] };
+}
 
 export function createEmptyExperienceEntry(): CvExperienceEntry {
   return {

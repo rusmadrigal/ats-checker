@@ -2,7 +2,7 @@ import { createOpenAI } from '@ai-sdk/openai';
 import { generateObject } from 'ai';
 import { AiImprovementError } from './improve-text-ai';
 import { cvStructuredSchema, type CvStructured } from './cv-structured-types';
-import { resolveOpenAiModelId } from './openai-model';
+import { openAiFailureUserMessage, resolveOpenAiModelId } from './openai-model';
 
 /**
  * Ajusta el CV estructurado para abordar los problemas listados (sin inventar hechos).
@@ -27,10 +27,11 @@ export async function fixCvIssuesWithAi(input: {
 
   const compact = JSON.stringify(input.structured);
 
-  const { object } = await generateObject({
-    model: openai(modelId),
-    schema: cvStructuredSchema,
-    system: `Eres editor senior de CV, experto en ATS y formato Harvard.
+  try {
+    const { object } = await generateObject({
+      model: openai(modelId),
+      schema: cvStructuredSchema,
+      system: `Eres editor senior de CV, experto en ATS y formato Harvard.
 Recibes el CV del usuario ya estructurado (JSON) y una lista de problemas detectados por un analizador.
 
 Tarea: devuelve el MISMO esquema (objeto CvStructured completo) aplicando correcciones que aborden esos problemas siempre que sea posible sin inventar datos.
@@ -46,16 +47,20 @@ Reglas estrictas:
 - skills: alinea longitudes original e improved por índice; added solo si es reformulación de contenido existente.
 - summary: actualiza improved y changes para reflejar arreglos; original puede quedar si es el texto fuente.
 - ats: actualiza scoreBefore/scoreAfter (0-100) de forma conservadora y improvements con breves notas en el MISMO idioma que el CV.
+- extraSections: conserva todas las entradas y el contenido salvo que un problema cite explícitamente borrar una sección concreta. No elimines REFERENCES, HOBBIES u otras secciones extra por iniciativa propia; si un problema sugiere acortar, ajusta wording mínimo o añade nota en ats.improvements.
 
 IDIOMA: todas las cadenas que generes o modifiques (improved, changes, ats.improvements, etc.) en el mismo idioma que el CV actual en el JSON.`,
-    prompt: `CV estructurado actual:
+      prompt: `CV estructurado actual:
 ${compact.slice(0, 120000)}
 
 Problemas detectados (abórdalos en la medida de lo posible):
 ${input.issues.map((s, i) => `${i + 1}. ${s}`).join('\n')}
 
 Devuelve el objeto completo corregido siguiendo el esquema.`,
-  });
+    });
 
-  return object;
+    return object;
+  } catch (e) {
+    throw new AiImprovementError(openAiFailureUserMessage(e, modelId));
+  }
 }

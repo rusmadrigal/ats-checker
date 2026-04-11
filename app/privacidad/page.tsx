@@ -1,10 +1,30 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
+import { SEO_SITE_NAME } from '@/src/lib/seo-defaults';
+import { siteCanonicalPath } from '@/src/lib/site-canonical';
+
+const privacidadUrl = siteCanonicalPath('/privacidad');
+const privacidadDesc =
+  'Información sobre el tratamiento de datos personales al usar el analizador de currículum ATS Resume Checker.';
 
 export const metadata: Metadata = {
-  title: 'Política de privacidad | ATS Resume Checker',
-  description:
-    'Información sobre el tratamiento de datos personales al usar el analizador de currículum ATS Resume Checker.',
+  title: `Política de privacidad | ${SEO_SITE_NAME}`,
+  description: privacidadDesc,
+  alternates: {
+    canonical: privacidadUrl,
+  },
+  openGraph: {
+    type: 'article',
+    url: privacidadUrl,
+    title: `Política de privacidad | ${SEO_SITE_NAME}`,
+    description: privacidadDesc,
+    siteName: SEO_SITE_NAME,
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: `Política de privacidad | ${SEO_SITE_NAME}`,
+    description: privacidadDesc,
+  },
 };
 
 export default function PrivacidadPage() {

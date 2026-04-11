@@ -2,7 +2,7 @@ import { createOpenAI } from '@ai-sdk/openai';
 import { generateObject } from 'ai';
 import { AiImprovementError } from './improve-text-ai';
 import { cvStructuredSchema, type CvStructured } from './cv-structured-types';
-import { resolveOpenAiModelId } from './openai-model';
+import { openAiFailureUserMessage, resolveOpenAiModelId } from './openai-model';
 
 export async function improveCvStructuredWithAi(input: {
   extractedText: string;
@@ -17,10 +17,11 @@ export async function improveCvStructuredWithAi(input: {
   const openai = createOpenAI({ apiKey });
   const modelId = resolveOpenAiModelId();
 
-  const { object } = await generateObject({
-    model: openai(modelId),
-    schema: cvStructuredSchema,
-    system: `Eres editor senior de CV, experto en ATS y en formato Harvard (claro, sobrio, sin adornos).
+  try {
+    const { object } = await generateObject({
+      model: openai(modelId),
+      schema: cvStructuredSchema,
+      system: `Eres editor senior de CV, experto en ATS y en formato Harvard (claro, sobrio, sin adornos).
 Extraes datos SOLO del texto del usuario. No inventes empresas, fechas, titulaciones ni logros.
 Puedes reformular con verbos de acción y claridad; añade métricas solo si el texto original las sugiere o permite inferirlas sin inventar cifras nuevas.
 
@@ -41,14 +42,25 @@ experience: un objeto por puesto relevante, orden cronológico inverso si el tex
 changes en cada experiencia: breves frases (wording, claridad, keywords ATS, métricas).
 skills: original e improved alineados por índice (misma longitud); added = habilidades útiles solo si aparecen en el CV o son reformulaciones evidentes del mismo contenido (no inventes stack nuevo).
 education y languages: según el CV.
-ats: scoreBefore y scoreAfter enteros 0-100 (estimación conservadora coherente con el texto); improvements = lista breve de mejoras ATS aplicadas.`,
-    prompt: `Texto extraído del CV:
+
+extraSections (OBLIGATORIO — no borrar contenido del usuario):
+- Cualquier bloque del texto de entrada que no quede cubierto solo por summary, experience, skills, education o languages (p. ej. REFERENCES, HOBBIES, CERTIFICATIONS, PROJECTS, AWARDS, VOLUNTEER) debe aparecer en extraSections.
+- Por cada bloque: title = encabezado reconocible (como en el CV o en MAYÚSCULAS cortas); content = TODO el texto de ese bloque (multilínea permitida).
+- Nunca omitas a propósito una sección con contenido real en el origen: mejoras para ATS, pero tú no eliminas secciones. Si algo pudiera restar claridad ATS (hobbies muy largos, referencias redundantes), conserva el contenido en extraSections y añade en ats.improvements una frase breve sugiriendo que el candidato podría acortar o mover esa parte manualmente si lo desea. No vacíes content ni omitas la entrada.
+- Puedes corregir tipografía menor o saltos de línea en content sin cambiar el significado.
+- Si el CV no tiene secciones de ese tipo, extraSections = [].
+
+ats: scoreBefore y scoreAfter enteros 0-100 (estimación conservadora coherente con el texto); improvements = lista breve de mejoras ATS aplicadas (puede incluir sugerencias sobre secciones extra sin borrarlas).`,
+      prompt: `Texto extraído del CV:
 ---
 ${input.extractedText.slice(0, 24000)}
 ---
 
 Devuelve el objeto completo siguiendo el esquema. Si falta una sección en el CV, usa arrays vacíos o cadenas vacías, sin rellenar con datos ficticios.`,
-  });
+    });
 
-  return object;
+    return object;
+  } catch (e) {
+    throw new AiImprovementError(openAiFailureUserMessage(e, modelId));
+  }
 }

@@ -14,6 +14,7 @@ import {
   Trash2,
   ChevronDown,
   Sparkles,
+  ExternalLink,
 } from 'lucide-react';
 import { Toaster, toast } from 'sonner';
 import { PreviewLoadingOverlay } from './components/PreviewLoadingOverlay';
@@ -47,9 +48,14 @@ import type { AnalysisIssue, AnalysisResult } from '@/src/lib/analysis-types';
 import { buildPlaintextFromStructured } from '@/src/lib/build-plaintext-from-structured';
 import { buildSectionsOutline } from '@/src/lib/build-sections-outline';
 import { classifyAtsIssueSeverity } from '@/src/lib/classify-ats-issue';
+import {
+  getStructuredPreviewIntegrityIssues,
+  mergeAnalysisIssuesDeduped,
+} from '@/src/lib/structured-preview-integrity-issues';
 import type { AiRescoreResult } from '@/src/lib/re-score-resume-ai';
 import type { CvApprovalMap, CvStructured } from '@/src/lib/cv-structured-types';
 import {
+  coerceStructuredCv,
   createEmptyEducationEntry,
   createEmptyExperienceEntry,
   defaultApprovalsForCv,
@@ -128,6 +134,7 @@ const translations = {
     footerCopyright: '© 2026 ATS Resume Checker.',
     footerNonProfit: 'Optimizador de CV con IA · Creado por',
     authorName: 'Rus Madrigal',
+    navCreditPrefix: 'Creado por',
     howItWorksTitle: 'Cómo funciona',
     step1Title: 'Sube tu currículum',
     step1Desc: 'Arrastra tu archivo PDF o DOCX para iniciar el análisis',
@@ -265,22 +272,29 @@ export default function App() {
 
   const displayIssues = useMemo((): AnalysisIssue[] => {
     if (!effectiveAnalysis) return [];
+    const structural =
+      structuredPreview !== null
+        ? getStructuredPreviewIntegrityIssues(structuredPreview, approvals)
+        : [];
+    const fromText = effectiveAnalysis.issues;
+    const fromAi: AnalysisIssue[] = [];
     if (structuredPreview && aiLive) {
-      const merged: AnalysisIssue[] = [];
       for (const raw of aiLive.issues) {
         const text = raw.trim();
         if (!text) continue;
-        merged.push({ type: classifyAtsIssueSeverity(text), text });
+        fromAi.push({ type: classifyAtsIssueSeverity(text), text });
       }
       for (const raw of aiLive.warnings ?? []) {
         const text = raw.trim();
         if (!text) continue;
-        merged.push({ type: 'warning', text });
+        fromAi.push({ type: 'warning', text });
       }
-      if (merged.length > 0) return merged;
     }
-    return effectiveAnalysis.issues;
-  }, [structuredPreview, aiLive, effectiveAnalysis]);
+    if (structuredPreview !== null) {
+      return mergeAnalysisIssuesDeduped(structural, fromText, fromAi);
+    }
+    return fromText;
+  }, [structuredPreview, approvals, aiLive, effectiveAnalysis]);
 
   const displayScore = aiLive && structuredPreview ? aiLive.score : (effectiveAnalysis?.score ?? 0);
 
@@ -428,8 +442,8 @@ export default function App() {
     const p = loadPreviewSession();
     if (!p) return;
     setAnalysis(p.analysis);
-    setStructuredPreview(p.structured);
-    setStructuredBaseline(cloneCvStructured(p.baseline));
+    setStructuredPreview(coerceStructuredCv(p.structured));
+    setStructuredBaseline(cloneCvStructured(coerceStructuredCv(p.baseline)));
     setApprovals(p.approvals);
     setAiLive(null);
     lastAiScoreRef.current = null;
@@ -542,8 +556,8 @@ export default function App() {
       setPersistFileKey(nextKey);
       setPersistFileName(file.name);
       if (reusePreview && storedBefore) {
-        setStructuredPreview(storedBefore.structured);
-        setStructuredBaseline(cloneCvStructured(storedBefore.baseline));
+        setStructuredPreview(coerceStructuredCv(storedBefore.structured));
+        setStructuredBaseline(cloneCvStructured(coerceStructuredCv(storedBefore.baseline)));
         setApprovals(storedBefore.approvals);
         setPreviewReadOnly(storedBefore.previewReadOnly);
         toast(t.previewRecoveredNoTokens, { duration: 3000 });
@@ -581,7 +595,7 @@ export default function App() {
       ) {
         throw new Error('Respuesta de vista previa no válida.');
       }
-      const structured = (data as { structured: CvStructured }).structured;
+      const structured = coerceStructuredCv((data as { structured: CvStructured }).structured);
       const appr = defaultApprovalsForCv(structured);
       setStructuredPreview(structured);
       setStructuredBaseline(cloneCvStructured(structured));
@@ -656,7 +670,7 @@ export default function App() {
       ) {
         throw new Error(t.fixIssuesError);
       }
-      const next = (data as { structured: CvStructured }).structured;
+      const next = coerceStructuredCv((data as { structured: CvStructured }).structured);
       const appr = defaultApprovalsForCv(next);
       setStructuredPreview(next);
       setApprovals(appr);
@@ -675,7 +689,7 @@ export default function App() {
   };
 
   const handleStructuredChange = (next: CvStructured) => {
-    setStructuredPreview(next);
+    setStructuredPreview(coerceStructuredCv(next));
   };
 
   const handleDeleteExperience = (index: number) => {
@@ -880,6 +894,24 @@ export default function App() {
     }
     setExportingFormat(format);
     try {
+      if (format === 'pdf' && structuredPreview) {
+        const { exportStructuredHarvardPdfToBlob } = await import(
+          '@/src/lib/export-harvard-pdf-client'
+        );
+        const blob = await exportStructuredHarvardPdfToBlob(structuredPreview, approvals);
+        const base =
+          (persistFileName ?? uploadedFile?.name ?? 'cv').replace(/\.[^/.]+$/, '') || 'cv';
+        const filename = `${base.replace(/[^\w\-]+/g, '_').slice(0, 80) || 'cv'}_mejorado.pdf`;
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        a.click();
+        URL.revokeObjectURL(url);
+        toast.success(t.exportSuccess);
+        return;
+      }
+
       const body = new FormData();
       if (uploadedFile) {
         body.append('file', uploadedFile);
@@ -943,7 +975,7 @@ export default function App() {
         transition={{ duration: 0.6 }}
         className="border-border/60 bg-background/85 sticky top-0 z-50 border-b backdrop-blur-md"
       >
-        <div className="mx-auto flex max-w-[min(100%,1920px)] items-center justify-start px-4 py-3 sm:px-8 sm:py-3.5">
+        <div className="mx-auto flex max-w-[min(100%,1920px)] items-center justify-between gap-3 px-4 py-3 sm:gap-4 sm:px-8 sm:py-3.5">
           <Link
             href="/"
             scroll={false}
@@ -953,7 +985,7 @@ export default function App() {
                 window.scrollTo({ top: 0, behavior: 'smooth' });
               }
             }}
-            className="focus-visible:ring-primary flex items-center gap-3 rounded-2xl outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
+            className="focus-visible:ring-primary flex min-w-0 flex-1 items-center gap-3 rounded-2xl outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
           >
             <div className="bg-primary flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl shadow-sm">
               <FileText className="text-primary-foreground h-[22px] w-[22px]" />
@@ -965,6 +997,27 @@ export default function App() {
               <span className="text-muted-foreground hidden text-xs sm:inline">{t.tagline}</span>
             </div>
           </Link>
+          <a
+            href="https://www.rusmadrigal.com/es"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="border-border/70 from-muted/30 to-muted/5 text-foreground hover:border-primary/35 hover:from-primary/8 hover:to-muted/20 group relative inline-flex shrink-0 items-center gap-2 overflow-hidden rounded-full border bg-gradient-to-br px-3 py-2 shadow-sm transition-all duration-300 sm:gap-2.5 sm:px-4 sm:py-2.5"
+            aria-label={`${t.navCreditPrefix} ${t.authorName} — sitio web (se abre en pestaña nueva)`}
+          >
+            <span
+              aria-hidden
+              className="from-primary/12 pointer-events-none absolute inset-0 bg-gradient-to-br to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100"
+            />
+            <span className="relative flex flex-col items-end leading-none sm:items-start">
+              <span className="text-muted-foreground mb-0.5 text-[9px] font-semibold tracking-[0.22em] uppercase sm:text-[10px]">
+                {t.navCreditPrefix}
+              </span>
+              <span className="text-foreground group-hover:text-primary text-[13px] font-semibold tracking-tight transition-colors sm:text-sm">
+                {t.authorName}
+              </span>
+            </span>
+            <ExternalLink className="text-muted-foreground group-hover:text-primary relative size-3.5 shrink-0 opacity-70 transition-all group-hover:opacity-100 sm:size-4" />
+          </a>
           {/*
           <button
             onClick={toggleLanguage}

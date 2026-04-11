@@ -1,9 +1,29 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
+import { SEO_SITE_NAME } from '@/src/lib/seo-defaults';
+import { siteCanonicalPath } from '@/src/lib/site-canonical';
+
+const cookiesUrl = siteCanonicalPath('/cookies');
+const cookiesDesc = 'Uso de cookies y tecnologías similares en ATS Resume Checker.';
 
 export const metadata: Metadata = {
-  title: 'Política de cookies | ATS Resume Checker',
-  description: 'Uso de cookies y tecnologías similares en ATS Resume Checker.',
+  title: `Política de cookies | ${SEO_SITE_NAME}`,
+  description: cookiesDesc,
+  alternates: {
+    canonical: cookiesUrl,
+  },
+  openGraph: {
+    type: 'article',
+    url: cookiesUrl,
+    title: `Política de cookies | ${SEO_SITE_NAME}`,
+    description: cookiesDesc,
+    siteName: SEO_SITE_NAME,
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: `Política de cookies | ${SEO_SITE_NAME}`,
+    description: cookiesDesc,
+  },
 };
 
 export default function CookiesPage() {

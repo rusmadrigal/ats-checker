@@ -1,10 +1,68 @@
 import type { Metadata, Viewport } from 'next';
 import '@/src/styles/index.css';
 import { CookieConsent } from '@/src/app/components/CookieConsent';
+import {
+  SEO_AUTHOR,
+  SEO_DESCRIPTION,
+  SEO_KEYWORDS,
+  SEO_LOCALE,
+  SEO_METADATA_BASE,
+  SEO_SITE_NAME,
+  SEO_TITLE,
+} from '@/src/lib/seo-defaults';
+import { SITE_CANONICAL_HOME_ES } from '@/src/lib/site-canonical';
 
 export const metadata: Metadata = {
-  title: 'ATS Resume Checker',
-  description: 'Análisis de CV con IA para compatibilidad ATS y mejoras accionables.',
+  metadataBase: SEO_METADATA_BASE,
+  title: SEO_TITLE,
+  description: SEO_DESCRIPTION,
+  applicationName: SEO_SITE_NAME,
+  authors: [{ name: SEO_AUTHOR.name, url: SEO_AUTHOR.url }],
+  creator: SEO_AUTHOR.name,
+  publisher: SEO_AUTHOR.name,
+  keywords: [...SEO_KEYWORDS],
+  category: 'technology',
+  alternates: {
+    canonical: SITE_CANONICAL_HOME_ES,
+    languages: {
+      'es-ES': SITE_CANONICAL_HOME_ES,
+    },
+  },
+  formatDetection: {
+    email: false,
+    address: false,
+    telephone: false,
+  },
+  openGraph: {
+    type: 'website',
+    locale: SEO_LOCALE,
+    url: SITE_CANONICAL_HOME_ES,
+    siteName: SEO_SITE_NAME,
+    title: SEO_TITLE,
+    description: SEO_DESCRIPTION,
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: SEO_TITLE,
+    description: SEO_DESCRIPTION,
+  },
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      'max-video-preview': -1,
+      'max-image-preview': 'large',
+      'max-snippet': -1,
+    },
+  },
+  manifest: '/site.webmanifest',
+  appleWebApp: {
+    title: SEO_SITE_NAME,
+    capable: true,
+    statusBarStyle: 'default',
+  },
 };
 
 export const viewport: Viewport = {

@@ -209,6 +209,21 @@ function HarvardAtsReadOnlyDocument({
           </p>
         </section>
       ) : null}
+
+      {(data.extraSections ?? []).map((sec, i) => {
+        if (!sec.title.trim() && !sec.content.trim()) return null;
+        const heading = sec.title.trim() || 'SECTION';
+        return (
+          <section key={`h-extra-${i}`} className="harvard-section mt-5">
+            <h2 className="harvard-section-title font-sans uppercase text-stone-900">{heading}</h2>
+            {sec.content.trim() ? (
+              <p className="mt-3 font-serif text-[13px] leading-[1.55] whitespace-pre-wrap text-stone-900">
+                {sec.content}
+              </p>
+            ) : null}
+          </section>
+        );
+      })}
     </div>
   );
 }
@@ -265,6 +280,11 @@ export function ResumeHarvardPreview({
           skills: 'Core skills',
           education: 'Education',
           languages: 'Languages',
+          extraSections: 'Other sections',
+          extraSectionTitle: 'Section title',
+          extraSectionBody: 'Content',
+          addExtraSection: 'Add section',
+          deleteExtraSection: 'Remove section',
           contact: 'Your name and contact',
           roleLine: 'Professional headline',
           readOnlyLabel: 'Clean view',
@@ -306,6 +326,11 @@ export function ResumeHarvardPreview({
           skills: 'Habilidades',
           education: 'Formación',
           languages: 'Idiomas',
+          extraSections: 'Otras secciones',
+          extraSectionTitle: 'Título de la sección',
+          extraSectionBody: 'Contenido',
+          addExtraSection: 'Añadir sección',
+          deleteExtraSection: 'Eliminar sección',
           contact: 'Nombre y contacto',
           roleLine: 'Título profesional',
           readOnlyLabel: 'Vista Previa',
@@ -388,6 +413,23 @@ export function ResumeHarvardPreview({
 
   const patchSummary = (field: 'original' | 'improved', value: string) => {
     onStructuredChange({ ...data, summary: { ...data.summary, [field]: value } });
+  };
+
+  const extras = data.extraSections ?? [];
+
+  const patchExtraSection = (index: number, field: 'title' | 'content', value: string) => {
+    const extraSections = extras.map((row, idx) =>
+      idx === index ? { ...row, [field]: value } : row,
+    );
+    onStructuredChange({ ...data, extraSections });
+  };
+
+  const addExtraSection = () => {
+    onStructuredChange({ ...data, extraSections: [...extras, { title: '', content: '' }] });
+  };
+
+  const deleteExtraSection = (index: number) => {
+    onStructuredChange({ ...data, extraSections: extras.filter((_, idx) => idx !== index) });
   };
 
   return (
@@ -1071,6 +1113,85 @@ export function ResumeHarvardPreview({
                   placeholder={language === 'en' ? 'One per line' : 'Un idioma por línea'}
                 />
               )}
+            </section>
+          )}
+
+          {(extras.length > 0 || !readOnly) && (
+            <section className="mt-8">
+              <div className="mb-4 flex flex-wrap items-center justify-between gap-2 border-b border-stone-900 pb-2">
+                <h2 className="text-[12px] font-bold tracking-[0.18em] text-stone-900 uppercase">
+                  {t.extraSections}
+                </h2>
+                {!readOnly ? (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="h-8 gap-1.5 border-dashed px-2.5 font-sans text-xs font-medium"
+                    onClick={addExtraSection}
+                  >
+                    <Plus className="size-3.5 shrink-0" aria-hidden />
+                    {t.addExtraSection}
+                  </Button>
+                ) : null}
+              </div>
+              <p className="text-muted-foreground mb-4 font-sans text-xs leading-relaxed">
+                {language === 'en'
+                  ? 'References, hobbies, certifications, and similar blocks stay here. The AI does not remove them; you can edit or delete below.'
+                  : 'Referencias, aficiones, certificaciones y bloques similares quedan aquí. La IA no los borra; puedes editarlos o eliminarlos abajo.'}
+              </p>
+              <ul className="space-y-5">
+                {extras.map((sec, i) => (
+                  <li key={`extra-section-${i}`}>
+                    {readOnly ? (
+                      sec.title.trim() || sec.content.trim() ? (
+                        <div>
+                          <h3 className="text-[12px] font-bold tracking-[0.12em] text-stone-900 uppercase">
+                            {sec.title.trim() || '—'}
+                          </h3>
+                          {sec.content.trim() ? (
+                            <p className={cn(readOnlyProse, 'mt-2')}>{sec.content}</p>
+                          ) : null}
+                        </div>
+                      ) : null
+                    ) : (
+                      <div className="flex flex-col gap-3 rounded-xl border border-stone-200/80 bg-stone-50/40 p-4">
+                        <div className="flex flex-wrap items-center justify-end gap-2">
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            className="text-destructive hover:text-destructive hover:bg-destructive/10 h-8 gap-1.5 px-2 font-sans text-xs font-medium"
+                            onClick={() => deleteExtraSection(i)}
+                          >
+                            <Trash2 className="size-3.5 shrink-0" aria-hidden />
+                            {t.deleteExtraSection}
+                          </Button>
+                        </div>
+                        <div>
+                          <p className="mb-1.5 font-sans text-[11px] font-semibold tracking-wide text-stone-500 uppercase">
+                            {t.extraSectionTitle}
+                          </p>
+                          <Input
+                            value={sec.title}
+                            onChange={(e) => patchExtraSection(i, 'title', e.target.value)}
+                            className={cn(resumeInput, 'text-[14px] font-semibold')}
+                            placeholder="REFERENCES, HOBBIES…"
+                          />
+                        </div>
+                        <div>
+                          <p className="mb-1.5 font-sans text-[11px] font-semibold tracking-wide text-stone-500 uppercase">
+                            {t.extraSectionBody}
+                          </p>
+                          <Textarea
+                            value={sec.content}
+                            onChange={(e) => patchExtraSection(i, 'content', e.target.value)}
+                            className={cn(resumeTextarea, 'min-h-[6rem] rounded-lg')}
+                          />
+                        </div>
+                      </div>
+                    )}
+                  </li>
+                ))}
+              </ul>
             </section>
           )}
             </>

@@ -233,6 +233,21 @@ export async function buildHarvardDocxFromStructured(
     }
   }
 
+  for (const sec of cv.extraSections ?? []) {
+    const t = sec.title.trim();
+    const c = sec.content.trim();
+    if (!t && !c) continue;
+    if (t) {
+      children.push(pSectionHeading(t.toUpperCase()));
+    }
+    if (c) {
+      c.split('\n').forEach((line) => {
+        const lt = line.trim();
+        if (lt) children.push(pBody(lt));
+      });
+    }
+  }
+
   const doc = new Document({
     sections: [
       {

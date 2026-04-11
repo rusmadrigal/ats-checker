@@ -227,6 +227,163 @@
     page-break-inside: avoid;
     break-inside: avoid;
   }
+
+  /**
+   * PDF Harvard (export cliente): un documento continuo `.resume`; el PDF pagina por altura A4 al rasterizar.
+   */
+  #pdf-root {
+    box-sizing: border-box;
+  }
+
+  .resume {
+    box-sizing: border-box;
+    width: 794px;
+    margin: 0 auto;
+    padding: 40px;
+    background: #ffffff;
+    color: #0c0a09;
+  }
+
+  .resume-flow-section {
+    margin-bottom: 16px;
+  }
+
+  .resume-summary-block {
+    margin-bottom: 16px;
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  .resume-job {
+    break-inside: avoid;
+    page-break-inside: avoid;
+    margin-bottom: 10px;
+  }
+
+  .resume-pdf-root {
+    font-family: Georgia, 'Times New Roman', Times, serif;
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .resume-pdf-name {
+    font-size: 24px;
+    font-weight: 700;
+    margin: 0 0 4px;
+    line-height: 1.2;
+  }
+
+  .resume-pdf-title-line {
+    margin: 0 0 6px;
+    font-size: 12px;
+    font-weight: 400;
+    line-height: 1.45;
+    color: #555555;
+  }
+
+  .resume-pdf-contact {
+    font-family: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial,
+      sans-serif;
+    font-size: 10px;
+    line-height: 1.45;
+    color: #666666;
+    margin: 0 0 12px;
+  }
+
+  .resume-pdf-rule {
+    margin: 0 0 12px;
+    border: 0;
+    border-bottom: 1px solid #999999;
+  }
+
+  .resume-pdf-section-title {
+    font-family: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial,
+      sans-serif;
+    font-size: 12px;
+    font-weight: 700;
+    margin: 16px 0 6px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    line-height: 1.35;
+    page-break-after: avoid;
+    break-after: avoid;
+  }
+
+  .resume-pdf-body {
+    font-size: 11px;
+    line-height: 1.5;
+    margin: 0;
+  }
+
+  .resume-pdf-body--prose {
+    white-space: pre-wrap;
+  }
+
+  .resume-pdf-job-head {
+    margin: 0;
+    font-size: 11px;
+    font-weight: 700;
+    line-height: 1.5;
+  }
+
+  .resume-pdf-job-role {
+    margin: 6px 0 0;
+    font-size: 11px;
+    font-weight: 400;
+    line-height: 1.5;
+  }
+
+  .resume-pdf-job-location {
+    margin: 4px 0 0;
+    font-family: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial,
+      sans-serif;
+    font-size: 11px;
+    line-height: 1.5;
+    color: #44403c;
+  }
+
+  .resume-pdf-list {
+    padding-left: 16px;
+    margin: 0;
+    list-style-type: disc;
+    font-size: 11px;
+    line-height: 1.5;
+  }
+
+  .resume-pdf-list li {
+    margin-bottom: 3px;
+    line-height: 1.5;
+  }
+
+  .resume-pdf-bullets {
+    margin-top: 4px;
+  }
+
+  .resume-pdf-bullets--skills {
+    margin-top: 8px;
+  }
+
+  .resume-pdf-edu-list {
+    margin: 6px 0 0;
+    padding: 0;
+    list-style: none;
+    font-size: 11px;
+    line-height: 1.5;
+  }
+
+  .resume-pdf-edu-item {
+    margin-bottom: 8px;
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  .resume-pdf-edu-degree {
+    font-weight: 600;
+  }
+
+  .resume-pdf-edu-period {
+    color: #44403c;
+  }
 }
 
 @layer base {

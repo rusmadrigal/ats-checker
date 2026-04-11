@@ -1,7 +1,7 @@
 import { createOpenAI } from '@ai-sdk/openai';
 import { generateObject } from 'ai';
 import { z } from 'zod';
-import { resolveOpenAiModelId } from './openai-model';
+import { openAiFailureUserMessage, resolveOpenAiModelId } from './openai-model';
 
 export class AiRescoreError extends Error {
   constructor(message: string) {
@@ -31,9 +31,7 @@ export const aiRescoreResultSchema = z.object({
     ),
   warnings: z
     .array(z.string())
-    .describe(
-      'Advertencias ATS (menos graves que issues pero visibles); es-419, breves',
-    )
+    .describe('Advertencias ATS (menos graves que issues pero visibles); es-419, breves')
     .default([]),
   strengths: z
     .array(z.string())
@@ -114,11 +112,12 @@ export async function rescoreResumeWithAi(input: {
     ? `Section outline (reference):\n${input.sectionsOutline.slice(0, 1800)}`
     : '';
 
-  const { object } = await generateObject({
-    model: openai(modelId),
-    schema: aiRescoreResultSchema,
-    system: SYSTEM,
-    prompt: `Full resume text (plain):
+  try {
+    const { object } = await generateObject({
+      model: openai(modelId),
+      schema: aiRescoreResultSchema,
+      system: SYSTEM,
+      prompt: `Full resume text (plain):
 ---
 ${input.resumeText.slice(0, 26000)}
 ---
@@ -130,18 +129,21 @@ ${outline}
 Recuerda: "issues" e "improvements" solo en español latinoamericano (es-419), nunca en inglés.
 
 Produce scores, issues, improvements, and delta.`,
-  });
+    });
 
-  return {
-    score: Math.round(Math.min(100, Math.max(0, object.score))),
-    delta: object.delta,
-    readability: Math.round(Math.min(100, Math.max(0, object.readability))),
-    keywords: Math.round(Math.min(100, Math.max(0, object.keywords))),
-    formatting: Math.round(Math.min(100, Math.max(0, object.formatting))),
-    experience: Math.round(Math.min(100, Math.max(0, object.experience))),
-    issues: object.issues.map((s) => s.trim()).filter(Boolean),
-    warnings: (object.warnings ?? []).map((s) => s.trim()).filter(Boolean),
-    strengths: (object.strengths ?? []).map((s) => s.trim()).filter(Boolean),
-    improvements: object.improvements.map((s) => s.trim()).filter(Boolean),
-  };
+    return {
+      score: Math.round(Math.min(100, Math.max(0, object.score))),
+      delta: object.delta,
+      readability: Math.round(Math.min(100, Math.max(0, object.readability))),
+      keywords: Math.round(Math.min(100, Math.max(0, object.keywords))),
+      formatting: Math.round(Math.min(100, Math.max(0, object.formatting))),
+      experience: Math.round(Math.min(100, Math.max(0, object.experience))),
+      issues: object.issues.map((s) => s.trim()).filter(Boolean),
+      warnings: (object.warnings ?? []).map((s) => s.trim()).filter(Boolean),
+      strengths: (object.strengths ?? []).map((s) => s.trim()).filter(Boolean),
+      improvements: object.improvements.map((s) => s.trim()).filter(Boolean),
+    };
+  } catch (e) {
+    throw new AiRescoreError(openAiFailureUserMessage(e, modelId));
+  }
 }
