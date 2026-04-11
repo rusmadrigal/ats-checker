@@ -1,3 +1,4 @@
+import '@/src/lib/install-dommatrix-polyfill';
 import { analyzeResumeText } from '@/src/lib/analyze-resume-heuristics';
 import { methodNotAllowedJson } from '@/src/lib/api-route-json';
 import { AnalysisHttpError, extractResumeText } from '@/src/lib/extract-resume-text';

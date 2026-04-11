@@ -31,12 +31,14 @@ export const aiRescoreResultSchema = z.object({
     ),
   warnings: z
     .array(z.string())
-    .describe('Advertencias ATS (menos graves que issues pero visibles); es-419, breves')
-    .default([]),
+    .describe(
+      'Advertencias ATS (menos graves que issues pero visibles); es-419, breves. Usa [] si no hay.',
+    ),
   strengths: z
     .array(z.string())
-    .describe('Fortalezas detectadas en esta versión; es-419, breves')
-    .default([]),
+    .describe(
+      'Fortalezas detectadas en esta versión; es-419, breves. Usa [] si el CV es muy débil.',
+    ),
   improvements: z
     .array(z.string())
     .describe(
@@ -82,8 +84,8 @@ Each issue string = one concrete problem, actionable, max ~120 characters when r
 
 - LANGUAGE (mandatory): Every entry in the issues array and every entry in the improvements array MUST be written in Latin American Spanish (es-419): clear, professional HR tone for the region. Never use English for those list items, even if the resume body is in English. You may still evaluate resumes in any language.
 - improvements: brief notes on what improved in this version vs the implied previous state (same language rule: es-419 only).
-- warnings: softer ATS risks (e.g. few metrics, thin keywords) in es-419.
-- strengths: what still works well in es-419 (can be empty if the CV is very weak).
+- warnings: softer ATS risks (e.g. few metrics, thin keywords) in es-419; array obligatorio, usa [] si no aplica.
+- strengths: what still works well in es-419; array obligatorio, usa [] si el CV es muy débil.
 - delta: change from previousScore when provided (negative if worse, positive if better); magnitude should match how sensitive the engine is.
 
 Return only data that matches the schema.`;
@@ -139,8 +141,8 @@ Produce scores, issues, improvements, and delta.`,
       formatting: Math.round(Math.min(100, Math.max(0, object.formatting))),
       experience: Math.round(Math.min(100, Math.max(0, object.experience))),
       issues: object.issues.map((s) => s.trim()).filter(Boolean),
-      warnings: (object.warnings ?? []).map((s) => s.trim()).filter(Boolean),
-      strengths: (object.strengths ?? []).map((s) => s.trim()).filter(Boolean),
+      warnings: object.warnings.map((s) => s.trim()).filter(Boolean),
+      strengths: object.strengths.map((s) => s.trim()).filter(Boolean),
       improvements: object.improvements.map((s) => s.trim()).filter(Boolean),
     };
   } catch (e) {

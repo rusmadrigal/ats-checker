@@ -1,3 +1,4 @@
+import '@/src/lib/install-dommatrix-polyfill';
 import mammoth from 'mammoth';
 import { PDFParse } from 'pdf-parse';
 
