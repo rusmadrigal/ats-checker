@@ -4,8 +4,10 @@
  */
 import DOMMatrix from '@thednp/dommatrix';
 
-const g = globalThis as typeof globalThis & { DOMMatrix?: typeof DOMMatrix };
+const g = globalThis as any;
 
 if (typeof g.DOMMatrix === 'undefined') {
-  g.DOMMatrix = DOMMatrix;
+  g.DOMMatrix = DOMMatrix as any;
 }
+
+export {};
