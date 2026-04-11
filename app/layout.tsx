@@ -10,7 +10,7 @@ import {
   SEO_SITE_NAME,
   SEO_TITLE,
 } from '@/src/lib/seo-defaults';
-import { SITE_CANONICAL_HOME_ES } from '@/src/lib/site-canonical';
+import { SITE_CANONICAL_HOME } from '@/src/lib/site-canonical';
 
 export const metadata: Metadata = {
   metadataBase: SEO_METADATA_BASE,
@@ -23,9 +23,9 @@ export const metadata: Metadata = {
   keywords: [...SEO_KEYWORDS],
   category: 'technology',
   alternates: {
-    canonical: SITE_CANONICAL_HOME_ES,
+    canonical: SITE_CANONICAL_HOME,
     languages: {
-      'es-ES': SITE_CANONICAL_HOME_ES,
+      'es-ES': SITE_CANONICAL_HOME,
     },
   },
   formatDetection: {
@@ -36,7 +36,7 @@ export const metadata: Metadata = {
   openGraph: {
     type: 'website',
     locale: SEO_LOCALE,
-    url: SITE_CANONICAL_HOME_ES,
+    url: SITE_CANONICAL_HOME,
     siteName: SEO_SITE_NAME,
     title: SEO_TITLE,
     description: SEO_DESCRIPTION,

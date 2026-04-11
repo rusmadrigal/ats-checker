@@ -1,11 +1,11 @@
 import type { MetadataRoute } from 'next';
-import { SITE_CANONICAL_HOME_ES, siteCanonicalPath } from '@/src/lib/site-canonical';
+import { SITE_CANONICAL_HOME, siteCanonicalPath } from '@/src/lib/site-canonical';
 
 export default function sitemap(): MetadataRoute.Sitemap {
   const lastModified = new Date();
   return [
     {
-      url: SITE_CANONICAL_HOME_ES,
+      url: SITE_CANONICAL_HOME,
       lastModified,
       changeFrequency: 'weekly',
       priority: 1,

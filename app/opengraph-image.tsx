@@ -98,7 +98,7 @@ export default function OpenGraphImage() {
             fontWeight: 500,
           }}
         >
-          rusmadrigal.com
+          ats.rusmadrigal.com
         </div>
       </div>
     ),

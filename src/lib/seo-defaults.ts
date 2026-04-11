@@ -1,4 +1,4 @@
-import { SITE_CANONICAL_HOME_ES, SITE_PUBLIC_ORIGIN } from './site-canonical';
+import { AUTHOR_PUBLIC_PROFILE_URL, SITE_CANONICAL_HOME } from './site-canonical';
 
 /** Textos SEO centralizados (meta, Open Graph, Schema). */
 export const SEO_TITLE =
@@ -13,7 +13,7 @@ export const SEO_LOCALE = 'es_ES';
 
 export const SEO_AUTHOR = {
   name: 'Rus Madrigal',
-  url: SITE_CANONICAL_HOME_ES,
+  url: AUTHOR_PUBLIC_PROFILE_URL,
 } as const;
 
 export const SEO_KEYWORDS = [
@@ -31,4 +31,5 @@ export const SEO_KEYWORDS = [
   'recursos humanos',
 ] as const;
 
-export const SEO_METADATA_BASE = new URL(SITE_PUBLIC_ORIGIN);
+/** Base para resolver rutas relativas de metadatos (OG image, etc.). */
+export const SEO_METADATA_BASE = new URL(SITE_CANONICAL_HOME);

@@ -4,13 +4,13 @@
 
 ## Páginas principales
 
-- [Inicio / herramienta](https://www.rusmadrigal.com/es): Sube un PDF o DOCX, recibe puntuación ATS, lista de incidencias, vista previa mejorada con IA y descarga del documento optimizado.
+- [Inicio / herramienta](https://ats.rusmadrigal.com/): Sube un PDF o DOCX, recibe puntuación ATS, lista de incidencias, vista previa mejorada con IA y descarga del documento optimizado.
 
 ## Legal y transparencia
 
-- [Política de privacidad](https://www.rusmadrigal.com/privacidad): Tratamiento de datos personales al usar el analizador.
-- [Política de cookies](https://www.rusmadrigal.com/cookies): Uso de cookies y preferencias en el sitio.
-- [Aviso legal](https://www.rusmadrigal.com/aviso-legal): Titular del sitio e información legal.
+- [Política de privacidad](https://ats.rusmadrigal.com/privacidad): Tratamiento de datos personales al usar el analizador.
+- [Política de cookies](https://ats.rusmadrigal.com/cookies): Uso de cookies y preferencias en el sitio.
+- [Aviso legal](https://ats.rusmadrigal.com/aviso-legal): Titular del sitio e información legal.
 
 ## Autor y contacto del proyecto
 
@@ -18,8 +18,8 @@
 
 ## Recursos técnicos (máquinas)
 
-- [Sitemap XML](https://www.rusmadrigal.com/sitemap.xml): URLs públicas indexables.
-- [Robots.txt](https://www.rusmadrigal.com/robots.txt): Reglas de rastreo (API excluida de indexación genérica).
+- [Sitemap XML](https://ats.rusmadrigal.com/sitemap.xml): URLs públicas indexables.
+- [Robots.txt](https://ats.rusmadrigal.com/robots.txt): Reglas de rastreo (API excluida de indexación genérica).
 
 ## Optional
 
