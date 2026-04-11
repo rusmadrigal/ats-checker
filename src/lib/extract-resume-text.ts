@@ -1,6 +1,8 @@
 import '@/src/lib/install-dommatrix-polyfill';
 import mammoth from 'mammoth';
-import { PDFParse } from 'pdf-parse';
+import { createRequire } from 'node:module';
+import { pathToFileURL } from 'node:url';
+import * as pdfjsLib from 'pdfjs-dist/legacy/build/pdf.mjs';
 
 const MAX_BYTES = 10 * 1024 * 1024;
 
@@ -8,6 +10,20 @@ const ALLOWED = new Set([
   'application/pdf',
   'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
 ]);
+
+const nodeRequire = createRequire(import.meta.url);
+let pdfWorkerSrcInitialized = false;
+
+/**
+ * Fake worker path uses `import(workerSrc)`. In the Vercel bundle, the default
+ * `pdf.worker.js` path does not exist; point at the installed `.mjs` worker instead.
+ */
+function ensurePdfWorkerSrc(): void {
+  if (pdfWorkerSrcInitialized) return;
+  const workerPath = nodeRequire.resolve('pdfjs-dist/legacy/build/pdf.worker.mjs');
+  pdfjsLib.GlobalWorkerOptions.workerSrc = pathToFileURL(workerPath).href;
+  pdfWorkerSrcInitialized = true;
+}
 
 export function assertAllowedMime(mime: string): void {
   if (!ALLOWED.has(mime)) {
@@ -45,6 +61,33 @@ function normalizeWhitespace(text: string): string {
     .trim();
 }
 
+async function extractPdfText(buffer: Buffer): Promise<string> {
+  ensurePdfWorkerSrc();
+
+  const pdf = await pdfjsLib
+    .getDocument({
+      data: new Uint8Array(buffer),
+      useWorkerFetch: false,
+      isEvalSupported: false,
+      useSystemFonts: true,
+    })
+    .promise;
+
+  let text = '';
+  try {
+    for (let i = 1; i <= pdf.numPages; i++) {
+      const page = await pdf.getPage(i);
+      const content = await page.getTextContent();
+      text +=
+        content.items.map((item) => ('str' in item ? item.str : '')).join(' ') + '\n';
+    }
+  } finally {
+    await pdf.destroy();
+  }
+
+  return text;
+}
+
 export async function extractResumeText(buffer: Buffer, mime: string): Promise<string> {
   assertSize(buffer);
   assertAllowedMime(mime);
@@ -54,11 +97,6 @@ export async function extractResumeText(buffer: Buffer, mime: string): Promise<s
     return normalizeWhitespace(value);
   }
 
-  const parser = new PDFParse({ data: buffer });
-  try {
-    const { text } = await parser.getText();
-    return normalizeWhitespace(text);
-  } finally {
-    await parser.destroy();
-  }
+  const raw = await extractPdfText(buffer);
+  return normalizeWhitespace(raw);
 }
