@@ -1,5 +1,10 @@
 import { NextResponse } from 'next/server';
 import { analyzeResumeText } from '@/src/lib/analyze-resume-heuristics';
+import {
+  apiJsonError,
+  internalErrorJson,
+  methodNotAllowedJson,
+} from '@/src/lib/api-route-json';
 import { buildImprovedPdfBuffer } from '@/src/lib/build-improved-pdf';
 import { convertDocxBufferToPdf } from '@/src/lib/convert-docx-to-pdf';
 import { buildHarvardDocxFromStructured } from '@/src/lib/build-harvard-docx';
@@ -11,6 +16,8 @@ import { mergeImprovedText } from '@/src/lib/merge-improved-text';
 import { getSectorPresentation, parseSector } from '@/src/lib/sector-meta';
 
 export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
+export const maxDuration = 60;
 
 function safeFilenameBase(name: string): string {
   const withoutExt = name.replace(/\.[^/.]+$/, '');
@@ -25,6 +32,10 @@ function safeFilenameBase(name: string): string {
 
 function truthyForm(value: FormDataEntryValue | null): boolean {
   return value === 'true' || value === '1' || value === 'on';
+}
+
+export function GET() {
+  return methodNotAllowedJson();
 }
 
 export async function POST(request: Request) {
@@ -61,12 +72,9 @@ export async function POST(request: Request) {
       if (
         !(typeof improvedTextOverride === 'string' && improvedTextOverride.trim().length > 40)
       ) {
-        return NextResponse.json(
-          {
-            error:
-              'Falta el archivo o un texto de vista previa suficiente para exportar. Sube de nuevo el CV o abre la sesión con el mismo archivo.',
-          },
-          { status: 400 },
+        return apiJsonError(
+          400,
+          'Falta el archivo o un texto de vista previa suficiente para exportar. Sube de nuevo el CV o abre la sesión con el mismo archivo.',
         );
       }
       improved = improvedTextOverride.trim();
@@ -156,16 +164,13 @@ export async function POST(request: Request) {
       },
     });
   } catch (e) {
+    console.error('[api/export-improved]', e);
     if (e instanceof AnalysisHttpError) {
-      return NextResponse.json({ error: e.message, code: e.code }, { status: e.status });
+      return Response.json({ error: e.message, code: e.code }, { status: e.status });
     }
     if (e instanceof AiImprovementError) {
-      return NextResponse.json({ error: e.message, code: 'AI_CONFIG' }, { status: 400 });
+      return Response.json({ error: e.message, code: 'AI_CONFIG' }, { status: 400 });
     }
-    console.error('[export-improved]', e);
-    return NextResponse.json(
-      { error: 'No se pudo generar el archivo. Prueba con otro PDF o DOCX.' },
-      { status: 500 },
-    );
+    return internalErrorJson(e);
   }
 }

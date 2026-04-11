@@ -132,7 +132,7 @@ const translations = {
     atsExplainP7:
       'Un CV «amigable para ATS» no sustituye una buena trayectoria: solo evita que se pierda información técnica en el camino. Después del filtro automático, suele haber revisión humana; el documento debe seguir siendo honesto, legible y fácil de escanear en pantalla o en impreso.',
     footerCopyright: '© 2026 ATS Resume Checker.',
-    footerNonProfit: 'Optimizador de CV con IA · Creado por',
+    footerVersion: 'Versión',
     authorName: 'Rus Madrigal',
     navCreditPrefix: 'Creado por',
     howItWorksTitle: 'Cómo funciona',
@@ -998,11 +998,11 @@ export default function App() {
             </div>
           </Link>
           <a
-            href="https://www.rusmadrigal.com/es"
+            href="https://www.linkedin.com/in/rusmadrigal/"
             target="_blank"
             rel="noopener noreferrer"
             className="border-border/70 from-muted/30 to-muted/5 text-foreground hover:border-primary/35 hover:from-primary/8 hover:to-muted/20 group relative inline-flex shrink-0 items-center gap-2 overflow-hidden rounded-full border bg-gradient-to-br px-3 py-2 shadow-sm transition-all duration-300 sm:gap-2.5 sm:px-4 sm:py-2.5"
-            aria-label={`${t.navCreditPrefix} ${t.authorName} — sitio web (se abre en pestaña nueva)`}
+            aria-label={`${t.navCreditPrefix} ${t.authorName} — LinkedIn (se abre en pestaña nueva)`}
           >
             <span
               aria-hidden
@@ -1518,16 +1518,11 @@ export default function App() {
           <div className="flex flex-col items-center justify-center gap-6 md:flex-row md:justify-between">
             <div className="text-muted-foreground flex max-w-xl flex-col gap-1.5 text-center text-sm md:text-left">
               <p>{t.footerCopyright}</p>
-              <p>
-                {t.footerNonProfit}{' '}
-                <Link
-                  href="https://www.rusmadrigal.com/es"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-primary decoration-primary/40 hover:decoration-primary font-medium underline underline-offset-2 transition-colors"
-                >
-                  {t.authorName}
-                </Link>
+              <p className="text-muted-foreground font-mono text-xs tracking-wide">
+                <span className="text-muted-foreground font-sans">{t.footerVersion}</span>{' '}
+                <span className="text-foreground/90 font-semibold">
+                  {process.env.NEXT_PUBLIC_APP_VERSION ?? 'V.local'}
+                </span>
               </p>
             </div>
             <nav

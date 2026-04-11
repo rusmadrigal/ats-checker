@@ -1,8 +1,18 @@
-import { NextResponse } from 'next/server';
 import { analyzeResumeText } from '@/src/lib/analyze-resume-heuristics';
+import {
+  apiJsonError,
+  internalErrorJson,
+  methodNotAllowedJson,
+} from '@/src/lib/api-route-json';
 import { AnalysisHttpError, extractResumeText } from '@/src/lib/extract-resume-text';
 
 export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
+export const maxDuration = 60;
+
+export function GET() {
+  return methodNotAllowedJson();
+}
 
 export async function POST(request: Request) {
   try {
@@ -10,7 +20,7 @@ export async function POST(request: Request) {
     const file = form.get('file');
 
     if (!file || !(file instanceof File)) {
-      return NextResponse.json({ error: 'Falta el archivo en el campo "file".' }, { status: 400 });
+      return apiJsonError(400, 'Falta el archivo en el campo "file".');
     }
 
     const mime = file.type;
@@ -19,15 +29,12 @@ export async function POST(request: Request) {
     const text = await extractResumeText(buffer, mime);
     const result = analyzeResumeText(text);
 
-    return NextResponse.json(result);
+    return Response.json(result);
   } catch (e) {
+    console.error('[api/analyze]', e);
     if (e instanceof AnalysisHttpError) {
-      return NextResponse.json({ error: e.message, code: e.code }, { status: e.status });
+      return Response.json({ error: e.message, code: e.code }, { status: e.status });
     }
-    console.error('[analyze]', e);
-    return NextResponse.json(
-      { error: 'No se pudo analizar el archivo. Prueba con otro PDF o DOCX.' },
-      { status: 500 },
-    );
+    return internalErrorJson(e);
   }
 }

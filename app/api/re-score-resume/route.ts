@@ -1,8 +1,15 @@
-import { NextResponse } from 'next/server';
 import { z } from 'zod';
+import {
+  apiJsonError,
+  internalErrorJson,
+  methodNotAllowedJson,
+  parseJsonBody,
+} from '@/src/lib/api-route-json';
 import { AiRescoreError, rescoreResumeWithAi } from '@/src/lib/re-score-resume-ai';
 
 export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
+export const maxDuration = 60;
 
 const bodySchema = z.object({
   resumeText: z.string().min(8).max(28000),
@@ -10,15 +17,20 @@ const bodySchema = z.object({
   sectionsOutline: z.string().max(4000).optional(),
 });
 
+export function GET() {
+  return methodNotAllowedJson();
+}
+
 export async function POST(request: Request) {
   try {
-    const json: unknown = await request.json();
-    const parsed = bodySchema.safeParse(json);
+    const parsedBody = await parseJsonBody(request);
+    if (!parsedBody.ok) {
+      return parsedBody.response;
+    }
+
+    const parsed = bodySchema.safeParse(parsedBody.data);
     if (!parsed.success) {
-      return NextResponse.json(
-        { error: 'Cuerpo inválido: resumeText requerido (8–28000 caracteres).' },
-        { status: 400 },
-      );
+      return apiJsonError(400, 'Cuerpo inválido: resumeText requerido (8–28000 caracteres).');
     }
 
     const result = await rescoreResumeWithAi({
@@ -27,15 +39,12 @@ export async function POST(request: Request) {
       sectionsOutline: parsed.data.sectionsOutline,
     });
 
-    return NextResponse.json(result);
+    return Response.json(result);
   } catch (e) {
+    console.error('[api/re-score-resume]', e);
     if (e instanceof AiRescoreError) {
-      return NextResponse.json({ error: e.message, code: 'AI_CONFIG' }, { status: 400 });
+      return Response.json({ error: e.message, code: 'AI_CONFIG' }, { status: 400 });
     }
-    console.error('[re-score-resume]', e);
-    return NextResponse.json(
-      { error: 'No se pudo recalcular la puntuación. Inténtalo de nuevo.' },
-      { status: 500 },
-    );
+    return internalErrorJson(e);
   }
 }
