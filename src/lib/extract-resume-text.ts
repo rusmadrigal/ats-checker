@@ -1,8 +1,6 @@
 import '@/src/lib/install-dommatrix-polyfill';
 import mammoth from 'mammoth';
-import { createRequire } from 'node:module';
-import { pathToFileURL } from 'node:url';
-import * as pdfjsLib from 'pdfjs-dist/legacy/build/pdf.mjs';
+import * as pdfjsLib from 'pdfjs-dist/legacy/build/pdf.js';
 
 const MAX_BYTES = 10 * 1024 * 1024;
 
@@ -10,20 +8,6 @@ const ALLOWED = new Set([
   'application/pdf',
   'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
 ]);
-
-const nodeRequire = createRequire(import.meta.url);
-let pdfWorkerSrcInitialized = false;
-
-/**
- * Fake worker path uses `import(workerSrc)`. In the Vercel bundle, the default
- * `pdf.worker.js` path does not exist; point at the installed `.mjs` worker instead.
- */
-function ensurePdfWorkerSrc(): void {
-  if (pdfWorkerSrcInitialized) return;
-  const workerPath = nodeRequire.resolve('pdfjs-dist/legacy/build/pdf.worker.mjs');
-  pdfjsLib.GlobalWorkerOptions.workerSrc = pathToFileURL(workerPath).href;
-  pdfWorkerSrcInitialized = true;
-}
 
 export function assertAllowedMime(mime: string): void {
   if (!ALLOWED.has(mime)) {
@@ -62,16 +46,12 @@ function normalizeWhitespace(text: string): string {
 }
 
 async function extractPdfText(buffer: Buffer): Promise<string> {
-  ensurePdfWorkerSrc();
-
-  const pdf = await pdfjsLib
-    .getDocument({
-      data: new Uint8Array(buffer),
-      useWorkerFetch: false,
-      isEvalSupported: false,
-      useSystemFonts: true,
-    })
-    .promise;
+  const pdf = await pdfjsLib.getDocument({
+    data: new Uint8Array(buffer),
+    useWorkerFetch: false,
+    isEvalSupported: false,
+    useSystemFonts: true,
+  }).promise;
 
   let text = '';
   try {
