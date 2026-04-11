@@ -65,8 +65,6 @@ import {
   remapApprovalsAfterSkillRowDelete,
 } from '@/src/lib/cv-structured-types';
 import { cloneCvStructured } from '@/src/lib/cv-structured-clone';
-import { clientApiUrl } from '@/src/lib/client-api-url';
-import { readJsonResponse } from '@/src/lib/read-json-response';
 import {
   clearPreviewSessionStorage,
   fileKeyFromFile,
@@ -378,7 +376,7 @@ export default function App() {
 
       void (async () => {
         try {
-          const res = await fetch(clientApiUrl('/api/re-score-resume'), {
+          const res = await fetch('/api/re-score-resume', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -388,7 +386,7 @@ export default function App() {
             }),
             signal: ac.signal,
           });
-          const data: unknown = await readJsonResponse(res);
+          const data: unknown = await res.json();
           if (requestId !== aiRescoreRequestId.current) return;
           if (!res.ok) {
             setAiLive(null);
@@ -533,8 +531,8 @@ export default function App() {
     try {
       const body = new FormData();
       body.append('file', file);
-      const res = await fetch(clientApiUrl('/api/analyze'), { method: 'POST', body });
-      const data: unknown = await readJsonResponse(res);
+      const res = await fetch('/api/analyze', { method: 'POST', body });
+      const data: unknown = await res.json();
       if (!res.ok) {
         const msg =
           typeof data === 'object' && data !== null && 'error' in data
@@ -580,8 +578,8 @@ export default function App() {
     try {
       const body = new FormData();
       body.append('file', file);
-      const res = await fetch(clientApiUrl('/api/improve-preview'), { method: 'POST', body });
-      const data: unknown = await readJsonResponse(res);
+      const res = await fetch('/api/improve-preview', { method: 'POST', body });
+      const data: unknown = await res.json();
       if (!res.ok) {
         const msg =
           typeof data === 'object' && data !== null && 'error' in data
@@ -648,7 +646,7 @@ export default function App() {
     aiFetchAbortRef.current?.abort();
     aiFetchAbortRef.current = null;
     try {
-      const res = await fetch(clientApiUrl('/api/fix-cv-issues'), {
+      const res = await fetch('/api/fix-cv-issues', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -656,7 +654,7 @@ export default function App() {
           issues: displayIssues.map((i) => i.text),
         }),
       });
-      const data: unknown = await readJsonResponse(res);
+      const data: unknown = await res.json();
       if (!res.ok) {
         const msg =
           typeof data === 'object' && data !== null && 'error' in data
@@ -930,14 +928,9 @@ export default function App() {
         body.append('filenameHint', persistFileName);
       }
       body.append('useAi', 'false');
-      const res = await fetch(clientApiUrl('/api/export-improved'), { method: 'POST', body });
+      const res = await fetch('/api/export-improved', { method: 'POST', body });
       if (!res.ok) {
-        let data: unknown = {};
-        try {
-          data = await readJsonResponse<unknown>(res);
-        } catch {
-          data = {};
-        }
+        const data: unknown = await res.json().catch(() => ({}));
         const msg =
           typeof data === 'object' && data !== null && 'error' in data
             ? String((data as { error: unknown }).error)

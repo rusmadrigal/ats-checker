@@ -1,9 +1,5 @@
 import { analyzeResumeText } from '@/src/lib/analyze-resume-heuristics';
-import {
-  apiJsonError,
-  internalErrorJson,
-  methodNotAllowedJson,
-} from '@/src/lib/api-route-json';
+import { methodNotAllowedJson } from '@/src/lib/api-route-json';
 import { AnalysisHttpError, extractResumeText } from '@/src/lib/extract-resume-text';
 
 export const runtime = 'nodejs';
@@ -14,27 +10,26 @@ export function GET() {
   return methodNotAllowedJson();
 }
 
-export async function POST(request: Request) {
+export async function POST(req: Request) {
   try {
-    const form = await request.formData();
-    const file = form.get('file');
+    const formData = await req.formData();
+    const file = formData.get('file');
 
     if (!file || !(file instanceof File)) {
-      return apiJsonError(400, 'Falta el archivo en el campo "file".');
+      return Response.json({ error: 'Falta archivo' }, { status: 400 });
     }
 
     const mime = file.type;
     const buffer = Buffer.from(await file.arrayBuffer());
-
     const text = await extractResumeText(buffer, mime);
     const result = analyzeResumeText(text);
 
     return Response.json(result);
-  } catch (e) {
-    console.error('[api/analyze]', e);
-    if (e instanceof AnalysisHttpError) {
-      return Response.json({ error: e.message, code: e.code }, { status: e.status });
+  } catch (error) {
+    console.error('[api/analyze]', error);
+    if (error instanceof AnalysisHttpError) {
+      return Response.json({ error: error.message, code: error.code }, { status: error.status });
     }
-    return internalErrorJson(e);
+    return Response.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
