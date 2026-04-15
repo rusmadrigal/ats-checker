@@ -78,7 +78,7 @@ const translations = {
   /*
   // English (disabled for now — keep for re-enabling i18n)
   en: {
-    title: 'ATS Resume Checker',
+    title: 'ATS Checker',
     tagline: 'AI-Powered Resume Analysis',
     headline: 'Check if your resume passes ATS filters',
     subheadline:
